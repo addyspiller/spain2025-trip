@@ -1,14 +1,5 @@
-// Firebase configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyBpQhBTpMgzinQlNJISd7Jm8uWxWXCxPao",
-    authDomain: "spain2025-9e7f6.firebaseapp.com",
-    databaseURL: "https://spain2025-9e7f6-default-rtdb.firebaseio.com",
-    projectId: "spain2025-9e7f6",
-    storageBucket: "spain2025-9e7f6.firebasestorage.app",
-    messagingSenderId: "921338138870",
-    appId: "1:921338138870:web:8d39742b119c198ebc5cd7",
-    measurementId: "G-6YRBJ1FFFY"
-};
+// Firebase configuration - loaded from secrets.js
+const firebaseConfig = window.API_CONFIG.firebase;
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
@@ -49,6 +40,7 @@ let googleMapsReady = false;
 
 // Track if we're updating from Firebase to avoid loops
 let updatingFromFirebase = false;
+let saveTimeout = null;
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
@@ -163,15 +155,13 @@ function setupEventListeners() {
     });
 
 
-    // Save and print buttons
-    document.querySelector('.save-btn').addEventListener('click', function() {
-        saveData();
-        showNotification('Your changes have been saved!');
-    });
-
-    document.querySelector('.print-btn').addEventListener('click', function() {
-        window.print();
-    });
+    // Print button
+    const printBtn = document.querySelector('.print-btn');
+    if (printBtn) {
+        printBtn.addEventListener('click', function() {
+            window.print();
+        });
+    }
 
     // Hotel selection
     const selectHotelBtns = document.querySelectorAll('.select-hotel-btn');
@@ -225,6 +215,141 @@ function setupEventListeners() {
     
     // Setup drag and drop
     setupDragAndDrop();
+    
+    // Activity log link
+    document.getElementById('activity-log-link').addEventListener('click', function(e) {
+        e.preventDefault();
+        showActivityLog();
+    });
+}
+
+// Track activity with location
+async function trackActivity(action) {
+    const activity = {
+        action: action,
+        timestamp: Date.now(),
+        date: new Date().toLocaleString(),
+        userAgent: navigator.userAgent
+    };
+    
+    // Try to get user location (requires HTTPS)
+    if (navigator.geolocation && window.location.protocol === 'https:') {
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+            });
+            activity.location = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+            };
+        } catch (error) {
+            console.log('Location not available');
+        }
+    }
+    
+    // Save activity to Firebase
+    const activitiesRef = database.ref(`trips/${tripId}/activityLog`);
+    activitiesRef.push(activity);
+}
+
+// Show activity log modal
+function showActivityLog() {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'activity-log-modal';
+    
+    modal.innerHTML = `
+        <div class="modal-content large">
+            <h3>Activity Log</h3>
+            <div id="activity-log-content" class="activity-log-content">
+                <p>Loading activity history...</p>
+            </div>
+            <div class="modal-buttons">
+                <button id="activity-log-close">Close</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Load and display activities
+    loadActivityLog();
+    
+    // Close button
+    document.getElementById('activity-log-close').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
+}
+
+// Load activity log from Firebase
+function loadActivityLog() {
+    const activitiesRef = database.ref(`trips/${tripId}/activityLog`);
+    const contentDiv = document.getElementById('activity-log-content');
+    
+    activitiesRef.orderByChild('timestamp').limitToLast(50).once('value', (snapshot) => {
+        const activities = [];
+        snapshot.forEach((childSnapshot) => {
+            activities.push(childSnapshot.val());
+        });
+        
+        if (activities.length === 0) {
+            contentDiv.innerHTML = '<div class="no-activities">No activity recorded yet.</div>';
+            return;
+        }
+        
+        // Sort by timestamp (newest first)
+        activities.reverse();
+        
+        let html = '<div class="activity-list">';
+        activities.forEach(activity => {
+            const device = getDeviceType(activity.userAgent);
+            const locationText = activity.location ? 
+                `<span class="activity-location">📍 ${activity.location.latitude.toFixed(2)}, ${activity.location.longitude.toFixed(2)}</span>` : 
+                '';
+            
+            html += `
+                <div class="activity-item">
+                    <div class="activity-header">
+                        <span class="activity-action">${activity.action}</span>
+                        <span class="activity-date">${activity.date}</span>
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-device">${device}</div>
+                        ${locationText}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        contentDiv.innerHTML = html;
+    });
+}
+
+// Get device type from user agent
+function getDeviceType(userAgent) {
+    if (/iPhone|iPad|iPod/i.test(userAgent)) {
+        return '📱 iOS';
+    } else if (/Android/i.test(userAgent)) {
+        return '📱 Android';
+    } else if (/Windows Phone/i.test(userAgent)) {
+        return '📱 Windows Phone';
+    } else if (/Macintosh/i.test(userAgent)) {
+        return '💻 Mac';
+    } else if (/Windows/i.test(userAgent)) {
+        return '💻 Windows';
+    } else if (/Linux/i.test(userAgent)) {
+        return '💻 Linux';
+    } else {
+        return '🖥️ Desktop';
+    }
 }
 
 // Select hotel for itinerary
@@ -615,7 +740,7 @@ function selectHotel(city, hotelName, hotelCard) {
 }
 
 // Google Places API Configuration
-const GOOGLE_PLACES_API_KEY = 'AIzaSyCp9Q1buixo8BTH7d_nHdpc4-KYSoIz8Wc';
+const GOOGLE_PLACES_API_KEY = window.API_CONFIG.googleMapsApiKey;
 const GOOGLE_PLACES_BASE_URL = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
 
 // City coordinates for Google Places API
@@ -1500,13 +1625,26 @@ function loadFromFirebase(callback) {
 // Setup real-time listeners for Firebase
 function setupFirebaseListeners() {
     const tripRef = database.ref(`trips/${tripId}`);
+    let isFirstLoad = true;
     
     // Listen for changes
     tripRef.on('value', (snapshot) => {
         if (updatingFromFirebase) return; // Avoid loops
         
         const data = snapshot.val();
-        if (data && data.lastUpdated && data.lastUpdated !== itineraryData.lastUpdated) {
+        if (!data) return;
+        
+        // Skip the first load (happens right after we set up the listener)
+        if (isFirstLoad) {
+            isFirstLoad = false;
+            return;
+        }
+        
+        // Only update if the timestamp is different AND newer than our last save
+        if (data.lastUpdated && 
+            data.lastUpdated !== itineraryData.lastUpdated && 
+            data.lastUpdated > (itineraryData.lastUpdated || 0)) {
+            
             console.log('Received update from Firebase');
             updatingFromFirebase = true;
             
@@ -1623,48 +1761,59 @@ function showShareModal() {
 function saveData() {
     if (updatingFromFirebase) return; // Don't save while updating from Firebase
     
-    // Collect all current data
-    const days = document.querySelectorAll('.day');
+    // Clear any existing save timeout
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+    }
     
-    // Save activities
-    itineraryData.activities = {};
-    days.forEach(day => {
-        const dayNum = day.getAttribute('data-day');
-        const activities = [];
+    // Debounce saves to prevent rapid firing
+    saveTimeout = setTimeout(() => {
+        // Collect all current data
+        const days = document.querySelectorAll('.day');
         
-        day.querySelectorAll('.activity-item').forEach(item => {
-            activities.push({
-                id: item.getAttribute('data-id'),
-                text: item.querySelector('.activity-text').innerHTML
+        // Save activities
+        itineraryData.activities = {};
+        days.forEach(day => {
+            const dayNum = day.getAttribute('data-day');
+            const activities = [];
+            
+            day.querySelectorAll('.activity-item').forEach(item => {
+                activities.push({
+                    id: item.getAttribute('data-id'),
+                    text: item.querySelector('.activity-text').innerHTML
+                });
             });
+            
+            itineraryData.activities[dayNum] = activities;
         });
         
-        itineraryData.activities[dayNum] = activities;
-    });
-    
-    
-    // Save collapsed states
-    itineraryData.collapsedDays = [];
-    days.forEach(day => {
-        if (day.classList.contains('collapsed')) {
-            itineraryData.collapsedDays.push(day.getAttribute('data-day'));
-        }
-    });
-    
-    // Add timestamp
-    itineraryData.lastUpdated = Date.now();
-    
-    // Save to Firebase
-    const tripRef = database.ref(`trips/${tripId}`);
-    tripRef.set(itineraryData)
-        .then(() => {
-            console.log('Saved to Firebase successfully');
-        })
-        .catch((error) => {
-            console.error('Error saving to Firebase:', error);
-            // Fallback to localStorage
-            localStorage.setItem('spainItinerary', JSON.stringify(itineraryData));
+        
+        // Save collapsed states
+        itineraryData.collapsedDays = [];
+        days.forEach(day => {
+            if (day.classList.contains('collapsed')) {
+                itineraryData.collapsedDays.push(day.getAttribute('data-day'));
+            }
         });
+        
+        // Add timestamp
+        itineraryData.lastUpdated = Date.now();
+        
+        // Track activity for the log
+        trackActivity('Trip updated');
+        
+        // Save to Firebase
+        const tripRef = database.ref(`trips/${tripId}`);
+        tripRef.set(itineraryData)
+            .then(() => {
+                console.log('Saved to Firebase successfully');
+            })
+            .catch((error) => {
+                console.error('Error saving to Firebase:', error);
+                // Fallback to localStorage
+                localStorage.setItem('spainItinerary', JSON.stringify(itineraryData));
+            });
+    }, 500); // Wait 500ms before saving
 }
 
 function loadSavedData() {

@@ -4,9 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spain Trip Planner - November</title>
+    <link rel="icon" type="image/png" href="spainflag.png">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCp9Q1buixo8BTH7d_nHdpc4-KYSoIz8Wc&libraries=places&callback=initMap"></script>
+    <script src="secrets.js"></script>
+    <script>
+        // Load Google Maps API with key from secrets
+        (function() {
+            const script = document.createElement('script');
+            script.async = true;
+            script.defer = true;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${window.API_CONFIG.googleMapsApiKey}&libraries=places&callback=initMap`;
+            document.head.appendChild(script);
+        })();
+    </script>
     
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -556,7 +567,6 @@
             </div>
 
             <div class="action-buttons">
-                <button class="save-btn"><i class="fas fa-save"></i> Save Changes</button>
                 <button class="print-btn"><i class="fas fa-print"></i> Print Itinerary</button>
             </div>
         </div>
@@ -1013,6 +1023,14 @@
         </div>
     </div>
 
+    <footer>
+        <div class="footer-content">
+            <a href="#" id="activity-log-link" class="footer-link">
+                <i class="fas fa-history"></i> View Activity Log
+            </a>
+        </div>
+    </footer>
+    
     <script src="script.js"></script>
 </body>
 </html>
