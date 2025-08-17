@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTripDatesDisplay();
     initializeTodoItems();
     updateTodoProgress();
+    initializeCityManagement();
 });
 
 function setupEventListeners() {
@@ -367,6 +368,23 @@ function setupModalControls() {
             });
         }
     });
+
+    // City management
+    document.getElementById('customize-trip-btn').addEventListener('click', function() {
+        const cityManagement = document.getElementById('city-management');
+        cityManagement.style.display = cityManagement.style.display === 'none' ? 'block' : 'none';
+        if (cityManagement.style.display === 'block') {
+            populateCityList();
+        }
+    });
+
+    document.getElementById('close-customization').addEventListener('click', function() {
+        document.getElementById('city-management').style.display = 'none';
+    });
+
+    document.getElementById('add-city-btn').addEventListener('click', addNewCity);
+
+    document.getElementById('regenerate-itinerary').addEventListener('click', regenerateItinerary);
 }
 
 function addActivity(day, text) {
@@ -1226,6 +1244,490 @@ function getCityActivities(city) {
     
     return activities;
 }
+
+// City Management Functions
+function initializeCityManagement() {
+    // Initialize city order if not present
+    if (!itineraryData.cityOrder) {
+        itineraryData.cityOrder = ['madrid', 'seville', 'cordoba', 'granada', 'madrid-final'];
+    }
+}
+
+function populateCityList() {
+    const cityList = document.getElementById('city-list');
+    cityList.innerHTML = '';
+    
+    // Get cities from the order or from durations
+    const cities = itineraryData.cityOrder || Object.keys(itineraryData.cityDurations);
+    
+    cities.forEach((city, index) => {
+        const nights = itineraryData.cityDurations[city] || 1;
+        const cityItem = createCityListItem(city, nights, index);
+        cityList.appendChild(cityItem);
+    });
+    
+    // Setup drag and drop for city reordering
+    setupCityDragAndDrop();
+}
+
+function createCityListItem(city, nights, index) {
+    const div = document.createElement('div');
+    div.className = 'city-item';
+    div.setAttribute('data-city', city);
+    div.setAttribute('draggable', 'true');
+    
+    const cityName = formatCityName(city);
+    
+    div.innerHTML = `
+        <div class="city-info">
+            <i class="fas fa-grip-vertical city-handle"></i>
+            <span class="city-name">${cityName}</span>
+            <span class="city-nights">${nights} nights</span>
+        </div>
+        <div class="city-actions">
+            <button class="remove-city-btn" onclick="removeCity('${city}')">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    return div;
+}
+
+function formatCityName(city) {
+    // Convert city ID to display name
+    const cityNames = {
+        'madrid': 'Madrid',
+        'madrid-final': 'Madrid (Final)',
+        'seville': 'Seville',
+        'cordoba': 'Córdoba',
+        'granada': 'Granada',
+        'barcelona': 'Barcelona',
+        'valencia': 'Valencia',
+        'bilbao': 'Bilbao',
+        'salamanca': 'Salamanca',
+        'toledo': 'Toledo',
+        'segovia': 'Segovia',
+        'malaga': 'Málaga',
+        'santiago': 'Santiago de Compostela'
+    };
+    
+    return cityNames[city] || city.charAt(0).toUpperCase() + city.slice(1);
+}
+
+function addNewCity() {
+    const citySelect = document.getElementById('new-city-select');
+    const nightsInput = document.getElementById('new-city-nights');
+    
+    const city = citySelect.value;
+    const nights = parseInt(nightsInput.value);
+    
+    if (!city || !nights || nights < 1) {
+        showNotification('Please select a city and enter valid number of nights!');
+        return;
+    }
+    
+    // Check if city already exists (except for duplicate Madrid stays)
+    if (itineraryData.cityDurations[city] && city !== 'madrid') {
+        showNotification('This city is already in your itinerary!');
+        return;
+    }
+    
+    // For duplicate cities, create a unique key
+    let cityKey = city;
+    if (itineraryData.cityDurations[city]) {
+        let counter = 2;
+        while (itineraryData.cityDurations[`${city}-${counter}`]) {
+            counter++;
+        }
+        cityKey = `${city}-${counter}`;
+    }
+    
+    // Add city to data
+    itineraryData.cityDurations[cityKey] = nights;
+    if (!itineraryData.cityOrder) {
+        itineraryData.cityOrder = Object.keys(itineraryData.cityDurations);
+    } else {
+        itineraryData.cityOrder.push(cityKey);
+    }
+    
+    // Reset form
+    citySelect.value = '';
+    nightsInput.value = '';
+    
+    // Refresh city list
+    populateCityList();
+    saveData();
+    
+    showNotification(`Added ${formatCityName(city)} (${nights} nights) to your itinerary!`);
+}
+
+function removeCity(city) {
+    if (confirm(`Are you sure you want to remove ${formatCityName(city)} from your itinerary?`)) {
+        // Remove from durations
+        delete itineraryData.cityDurations[city];
+        
+        // Remove from order
+        if (itineraryData.cityOrder) {
+            itineraryData.cityOrder = itineraryData.cityOrder.filter(c => c !== city);
+        }
+        
+        // Remove selected hotel for this city
+        if (itineraryData.selectedHotels[city]) {
+            delete itineraryData.selectedHotels[city];
+        }
+        
+        populateCityList();
+        saveData();
+        
+        showNotification(`Removed ${formatCityName(city)} from your itinerary!`);
+    }
+}
+
+function setupCityDragAndDrop() {
+    const cityItems = document.querySelectorAll('.city-item');
+    
+    cityItems.forEach(item => {
+        item.addEventListener('dragstart', function(e) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+            this.classList.add('dragging');
+        });
+        
+        item.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            
+            // Update city order based on new DOM order
+            const newOrder = [];
+            document.querySelectorAll('.city-item').forEach(cityItem => {
+                newOrder.push(cityItem.getAttribute('data-city'));
+            });
+            
+            itineraryData.cityOrder = newOrder;
+            saveData();
+        });
+        
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            const draggingItem = document.querySelector('.city-item.dragging');
+            const cityList = this.parentElement;
+            const afterElement = getDragAfterElement(cityList, e.clientY);
+            
+            if (afterElement == null) {
+                cityList.appendChild(draggingItem);
+            } else {
+                cityList.insertBefore(draggingItem, afterElement);
+            }
+        });
+    });
+}
+
+function regenerateItinerary() {
+    if (!confirm('This will regenerate the entire itinerary based on your city selections. Current activities and notes will be preserved where possible. Continue?')) {
+        return;
+    }
+    
+    // Store current activities and notes for preservation
+    const preservedData = {
+        activities: { ...itineraryData.activities },
+        notes: { ...itineraryData.notes },
+        dayTitles: { ...itineraryData.dayTitles }
+    };
+    
+    // Clear the daily itinerary section
+    const itinerarySection = document.querySelector('.itinerary-section .week-section').parentElement;
+    const weekSections = itinerarySection.querySelectorAll('.week-section');
+    weekSections.forEach(section => section.remove());
+    
+    // Generate new structure
+    generateNewItineraryStructure();
+    
+    // Update summary table
+    updateSummaryTable();
+    
+    // Close customization panel
+    document.getElementById('city-management').style.display = 'none';
+    
+    showNotification('Itinerary regenerated! Activities have been preserved where possible.');
+    saveData();
+}
+
+function generateNewItineraryStructure() {
+    const itinerarySection = document.querySelector('.itinerary-section');
+    const h2 = itinerarySection.querySelector('h2');
+    
+    const cities = itineraryData.cityOrder || Object.keys(itineraryData.cityDurations);
+    let dayCounter = 1;
+    let weekCounter = 1;
+    let currentWeekDiv = null;
+    
+    cities.forEach((city, cityIndex) => {
+        const nights = itineraryData.cityDurations[city];
+        const cityDisplayName = formatCityName(city);
+        
+        // Create new week section if needed (every 7 days)
+        if (!currentWeekDiv || dayCounter > 7 * weekCounter) {
+            currentWeekDiv = document.createElement('div');
+            currentWeekDiv.className = 'week-section';
+            
+            const weekTitle = document.createElement('h3');
+            weekTitle.textContent = `Week ${weekCounter}`;
+            currentWeekDiv.appendChild(weekTitle);
+            
+            itinerarySection.appendChild(currentWeekDiv);
+            weekCounter++;
+        }
+        
+        // Add travel day if not first city
+        if (cityIndex > 0) {
+            const prevCity = cities[cityIndex - 1];
+            const travelDay = createTravelDay(dayCounter, formatCityName(prevCity), cityDisplayName);
+            currentWeekDiv.appendChild(travelDay);
+            dayCounter++;
+        } else {
+            // First day - arrival
+            const arrivalDay = createArrivalDay(dayCounter, cityDisplayName);
+            currentWeekDiv.appendChild(arrivalDay);
+            dayCounter++;
+        }
+        
+        // Add stay days
+        for (let i = 1; i < nights; i++) {
+            const stayDay = createStayDay(dayCounter, cityDisplayName, city);
+            currentWeekDiv.appendChild(stayDay);
+            dayCounter++;
+        }
+    });
+    
+    // Add departure day
+    const departureDay = createDepartureDay(dayCounter);
+    currentWeekDiv.appendChild(departureDay);
+    
+    // Re-initialize event listeners for new elements
+    setupDayEventListeners();
+}
+
+function createTravelDay(dayNum, fromCity, toCity) {
+    const day = document.createElement('div');
+    day.className = 'day';
+    day.setAttribute('data-day', dayNum);
+    day.setAttribute('data-city', toCity.toLowerCase());
+    
+    day.innerHTML = `
+        <div class="day-header">
+            <h4>Day ${dayNum} — ${fromCity} → ${toCity}</h4>
+            <div class="travel-info">
+                <i class="fas fa-train"></i> Travel day
+                <button class="book-transport-btn" data-route="${fromCity.toLowerCase()}-${toCity.toLowerCase()}" title="Book transport">
+                    <i class="fas fa-ticket-alt"></i>
+                </button>
+            </div>
+            <div class="day-controls">
+                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                <button class="toggle-btn">−</button>
+            </div>
+        </div>
+        <div class="day-content">
+            <ul class="activity-list">
+                <li class="activity-item" data-id="act-${dayNum}-1">
+                    <span class="activity-text">Travel from ${fromCity} to ${toCity}</span>
+                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                </li>
+            </ul>
+            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+            <div class="notes-section">
+                <label>Personal Notes:</label>
+                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
+            </div>
+        </div>
+    `;
+    
+    return day;
+}
+
+function createArrivalDay(dayNum, city) {
+    const day = document.createElement('div');
+    day.className = 'day';
+    day.setAttribute('data-day', dayNum);
+    day.setAttribute('data-city', city.toLowerCase());
+    
+    day.innerHTML = `
+        <div class="day-header">
+            <h4>Day ${dayNum} — Arrive ${city}</h4>
+            <div class="day-controls">
+                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                <button class="toggle-btn">−</button>
+            </div>
+        </div>
+        <div class="day-content">
+            <ul class="activity-list">
+                <li class="activity-item" data-id="act-${dayNum}-1">
+                    <span class="activity-text">Arrive in ${city}</span>
+                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                </li>
+                <li class="activity-item" data-id="act-${dayNum}-2">
+                    <span class="activity-text">Check in to hotel</span>
+                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                </li>
+            </ul>
+            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+            <div class="notes-section">
+                <label>Personal Notes:</label>
+                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
+            </div>
+        </div>
+    `;
+    
+    return day;
+}
+
+function createStayDay(dayNum, city, cityKey) {
+    const day = document.createElement('div');
+    day.className = 'day';
+    day.setAttribute('data-day', dayNum);
+    day.setAttribute('data-city', cityKey);
+    
+    day.innerHTML = `
+        <div class="day-header">
+            <h4>Day ${dayNum} — ${city}</h4>
+            <div class="day-controls">
+                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                <button class="toggle-btn">−</button>
+            </div>
+        </div>
+        <div class="day-content">
+            <ul class="activity-list">
+            </ul>
+            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+            <div class="notes-section">
+                <label>Personal Notes:</label>
+                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
+            </div>
+        </div>
+    `;
+    
+    return day;
+}
+
+function createDepartureDay(dayNum) {
+    const day = document.createElement('div');
+    day.className = 'day';
+    day.setAttribute('data-day', dayNum);
+    day.setAttribute('data-city', 'departure');
+    
+    day.innerHTML = `
+        <div class="day-header">
+            <h4>Day ${dayNum} — Departure</h4>
+            <div class="day-controls">
+                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                <button class="toggle-btn">−</button>
+            </div>
+        </div>
+        <div class="day-content">
+            <ul class="activity-list">
+                <li class="activity-item" data-id="act-${dayNum}-1">
+                    <span class="activity-text">Transfer to airport</span>
+                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                </li>
+            </ul>
+            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+            <div class="notes-section">
+                <label>Personal Notes:</label>
+                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
+            </div>
+        </div>
+    `;
+    
+    return day;
+}
+
+function setupDayEventListeners() {
+    // Re-setup all event listeners for the new day elements
+    const dayHeaders = document.querySelectorAll('.day-header');
+    dayHeaders.forEach(header => {
+        header.addEventListener('click', function(e) {
+            if (!e.target.closest('.edit-day-btn')) {
+                const day = this.parentElement;
+                day.classList.toggle('collapsed');
+                saveData();
+            }
+        });
+    });
+    
+    const editDayBtns = document.querySelectorAll('.edit-day-btn');
+    editDayBtns.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dayHeader = this.closest('.day-header');
+            const h4 = dayHeader.querySelector('h4');
+            const dayNum = this.closest('.day').getAttribute('data-day');
+            showDayModal(h4.textContent, dayNum);
+        });
+    });
+    
+    const addActivityBtns = document.querySelectorAll('.add-activity-btn');
+    addActivityBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const day = this.closest('.day');
+            showActivityModal(null, day);
+        });
+    });
+    
+    const noteTextareas = document.querySelectorAll('.day-notes');
+    noteTextareas.forEach(textarea => {
+        textarea.addEventListener('input', function() {
+            saveData();
+        });
+    });
+    
+    // Re-setup drag and drop
+    setupDragAndDrop();
+    
+    // Re-apply trip dates if they exist
+    updateDayDates();
+}
+
+function updateSummaryTable() {
+    const tbody = document.querySelector('.summary-table tbody');
+    tbody.innerHTML = '';
+    
+    const cities = itineraryData.cityOrder || Object.keys(itineraryData.cityDurations);
+    
+    cities.forEach(city => {
+        const nights = itineraryData.cityDurations[city];
+        const cityDisplayName = formatCityName(city);
+        const selectedHotel = itineraryData.selectedHotels[city];
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${cityDisplayName}</td>
+            <td class="editable-nights" data-city="${city}" data-min="1" data-max="10">
+                ${nights} <button class="edit-nights-btn" title="Edit duration"><i class="fas fa-edit"></i></button>
+            </td>
+            <td class="hotel-cell ${selectedHotel ? 'selected' : ''}" data-city="${city}">
+                ${selectedHotel ? `<span class="selected-hotel-name">${selectedHotel}</span>` : '<span class="hotel-placeholder">Select from Hotels tab</span>'}
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    // Re-attach edit nights event listeners
+    const editNightsBtns = tbody.querySelectorAll('.edit-nights-btn');
+    editNightsBtns.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            const cell = e.target.closest('.editable-nights');
+            const city = cell.getAttribute('data-city');
+            const currentNights = parseInt(cell.textContent.trim());
+            showEditNightsModal(city, currentNights);
+        });
+    });
+}
+
+// Make removeCity globally accessible
+window.removeCity = removeCity;
 
 // Auto-save
 setInterval(saveData, 30000);
