@@ -8,12 +8,27 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
-        // Load Google Maps API with key from environment
+        // API Configuration - replaced during build
+        window.API_CONFIG = {
+            firebase: {
+                apiKey: "%%FIREBASE_API_KEY%%",
+                authDomain: "%%FIREBASE_AUTH_DOMAIN%%",
+                databaseURL: "%%FIREBASE_DATABASE_URL%%",
+                projectId: "%%FIREBASE_PROJECT_ID%%",
+                storageBucket: "%%FIREBASE_STORAGE_BUCKET%%",
+                messagingSenderId: "%%FIREBASE_MESSAGING_SENDER_ID%%",
+                appId: "%%FIREBASE_APP_ID%%",
+                measurementId: "%%FIREBASE_MEASUREMENT_ID%%"
+            },
+            googleMapsApiKey: "%%GOOGLE_MAPS_API_KEY%%"
+        };
+        
+        // Load Google Maps API with key from config
         (function() {
             const script = document.createElement('script');
             script.async = true;
             script.defer = true;
-            script.src = `https://maps.googleapis.com/maps/api/js?key=%%GOOGLE_MAPS_API_KEY%%&libraries=places&callback=initMap`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${window.API_CONFIG.googleMapsApiKey}&libraries=places&callback=initMap`;
             document.head.appendChild(script);
         })();
     </script>
@@ -22,4 +37,1014 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
-<!-- Rest of HTML content would be identical to current index.html -->
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Silvia & Irene's Spain Trip Planner</h1>
+            <p class="subtitle">November · Madrid + Andalucía · 14–15 Days</p>
+            <div class="trip-dates-section">
+                <button id="set-dates-btn" class="set-dates-btn">
+                    <i class="fas fa-calendar-alt"></i> Set Trip Dates
+                </button>
+                <span id="trip-dates-display" class="trip-dates-display" style="display: none;"></span>
+            </div>
+        </header>
+
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="itinerary">
+                <i class="fas fa-calendar-alt"></i> Itinerary
+            </button>
+            <button class="tab-btn" data-tab="hotels">
+                <i class="fas fa-bed"></i> Hotels
+            </button>
+            <button class="tab-btn" data-tab="search">
+                <i class="fas fa-search"></i> Discover
+            </button>
+            <button class="tab-btn" data-tab="todos" id="todos-tab-btn">
+                <i class="fas fa-exclamation-triangle"></i> To-Do
+                <span class="todo-badge" id="todo-badge">5</span>
+            </button>
+        </nav>
+
+        <!-- Itinerary Tab -->
+        <div class="tab-content active" id="itinerary-tab">
+            <div class="summary-section">
+                <h2>Trip Overview</h2>
+                <p class="booking-info">
+                    Book trains at <a href="https://www.renfe.com/es/en" target="_blank">Renfe</a>. 
+                    Buses via <a href="https://www.alsa.com/en" target="_blank">ALSA</a>.
+                </p>
+                
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>City</th>
+                            <th>Nights</th>
+                            <th>Selected Hotel</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Madrid</td>
+                            <td class="editable-nights" data-city="madrid" data-min="5" data-max="10">
+                                7 <button class="edit-nights-btn" title="Edit duration"><i class="fas fa-edit"></i></button>
+                            </td>
+                            <td class="hotel-cell" data-city="madrid-week1">
+                                <span class="hotel-placeholder">Select from Hotels tab</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Seville</td>
+                            <td class="editable-nights" data-city="seville" data-min="2" data-max="5">
+                                3 <button class="edit-nights-btn" title="Edit duration"><i class="fas fa-edit"></i></button>
+                            </td>
+                            <td class="hotel-cell" data-city="seville">
+                                <span class="hotel-placeholder">Select from Hotels tab</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Córdoba</td>
+                            <td class="editable-nights" data-city="cordoba" data-min="1" data-max="3">
+                                1 <button class="edit-nights-btn" title="Edit duration"><i class="fas fa-edit"></i></button>
+                            </td>
+                            <td class="hotel-cell" data-city="cordoba">
+                                <span class="hotel-placeholder">Select from Hotels tab</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Granada</td>
+                            <td class="editable-nights" data-city="granada" data-min="2" data-max="4">
+                                3 <button class="edit-nights-btn" title="Edit duration"><i class="fas fa-edit"></i></button>
+                            </td>
+                            <td class="hotel-cell" data-city="granada">
+                                <span class="hotel-placeholder">Select from Hotels tab</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Madrid (final)</td>
+                            <td class="editable-nights" data-city="madrid-final" data-min="1" data-max="2">
+                                1 <button class="edit-nights-btn" title="Edit duration"><i class="fas fa-edit"></i></button>
+                            </td>
+                            <td class="hotel-cell" data-city="madrid-final">
+                                <span class="hotel-placeholder">Select from Hotels tab</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="trip-customization">
+                <button id="customize-trip-btn" class="customize-trip-btn">
+                    <i class="fas fa-cog"></i> Customize Trip Structure
+                </button>
+                <div id="city-management" class="city-management" style="display: none;">
+                    <h3>Manage Your Trip Cities</h3>
+                    <div class="city-list" id="city-list">
+                        <!-- Cities will be populated dynamically -->
+                    </div>
+                    <div class="add-city-section">
+                        <h4>Add New City</h4>
+                        <div class="add-city-controls">
+                            <select id="new-city-select" class="city-select">
+                                <option value="">Select a city...</option>
+                                <option value="madrid">Madrid</option>
+                                <option value="barcelona">Barcelona</option>
+                                <option value="seville">Seville</option>
+                                <option value="granada">Granada</option>
+                                <option value="cordoba">Córdoba</option>
+                                <option value="valencia">Valencia</option>
+                                <option value="bilbao">Bilbao</option>
+                                <option value="salamanca">Salamanca</option>
+                                <option value="toledo">Toledo</option>
+                                <option value="segovia">Segovia</option>
+                                <option value="malaga">Málaga</option>
+                                <option value="santiago">Santiago de Compostela</option>
+                            </select>
+                            <input type="number" id="new-city-nights" placeholder="Nights" min="1" max="10" class="nights-input">
+                            <button id="add-city-btn" class="add-city-btn">
+                                <i class="fas fa-plus"></i> Add City
+                            </button>
+                        </div>
+                    </div>
+                    <div class="city-management-actions">
+                        <button id="regenerate-itinerary" class="regenerate-btn">
+                            <i class="fas fa-sync"></i> Regenerate Itinerary
+                        </button>
+                        <button id="close-customization" class="close-customization-btn">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="itinerary-section">
+                <h2>Day-by-Day Itinerary</h2>
+                
+                <div class="week-section">
+                    <h3>Week 1 — Madrid Base</h3>
+                    
+                    <div class="day" data-day="1" data-city="madrid">
+                        <div class="day-header">
+                            <h4>Day 1 — Arrive Madrid</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-1-1">
+                                    <span class="activity-text">Easy stroll in <a href="https://esmadrid.com/en/tourist-information/parque-del-retiro" target="_blank">Retiro Park & Crystal Palace</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-1-2">
+                                    <span class="activity-text">Dinner near Plaza Mayor / La Latina</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="2" data-city="madrid">
+                        <div class="day-header">
+                            <h4>Day 2 — Madrid — Art Triangle</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-2-1">
+                                    <span class="activity-text"><a href="https://www.museodelprado.es/en" target="_blank">Museo del Prado</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-2-2">
+                                    <span class="activity-text"><a href="https://www.museoreinasofia.es/en" target="_blank">Museo Reina Sofía (Guernica)</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-2-3">
+                                    <span class="activity-text">Evening tapas in La Latina (consider: <a href="https://devourtours.com/madrid/" target="_blank">Devour Madrid</a>)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="3" data-city="madrid">
+                        <div class="day-header">
+                            <h4>Day 3 — Madrid — Royal Route</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-3-1">
+                                    <span class="activity-text"><a href="https://www.patrimonionacional.es/en/royal-site/royal-palace-madrid" target="_blank">Royal Palace</a> & Almudena Cathedral</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-3-2">
+                                    <span class="activity-text">Puerta del Sol & Plaza Mayor</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-3-3">
+                                    <span class="activity-text">Optional flamenco: <a href="https://cardamomo.com/" target="_blank">Cardamomo</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="4" data-city="toledo">
+                        <div class="day-header">
+                            <h4>Day 4 — Day Trip — Toledo</h4>
+                            <div class="travel-info">
+                                <i class="fas fa-train"></i> 30 min train
+                            </div>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-4-1">
+                                    <span class="activity-text">Toledo Cathedral · El Greco Museum · Jewish Quarter</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-4-2">
+                                    <span class="activity-text"><a href="https://toledomonumental.com/en/" target="_blank">Toledo info</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="5" data-city="madrid">
+                        <div class="day-header">
+                            <h4>Day 5 — Madrid — Thyssen + Markets</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-5-1">
+                                    <span class="activity-text"><a href="https://www.museothyssen.org/en" target="_blank">Thyssen-Bornemisza</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-5-2">
+                                    <span class="activity-text">Gran Vía architecture walk</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-5-3">
+                                    <span class="activity-text">Mercado de San Miguel (gourmet tapas market)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="6" data-city="segovia">
+                        <div class="day-header">
+                            <h4>Day 6 — Day Trip — Segovia</h4>
+                            <div class="travel-info">
+                                <i class="fas fa-train"></i> 30 min train
+                            </div>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-6-1">
+                                    <span class="activity-text">Roman Aqueduct · Alcázar of Segovia</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-6-2">
+                                    <span class="activity-text"><a href="https://www.turismodesegovia.com/en/" target="_blank">Segovia tourism</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="7" data-city="avila">
+                        <div class="day-header">
+                            <h4>Day 7 — Day Trip — Ávila or El Escorial</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-7-1">
+                                    <span class="activity-text">Ávila medieval walls: <a href="https://turismoavila.com/" target="_blank">tourism site</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-7-2">
+                                    <span class="activity-text">OR El Escorial Monastery: <a href="https://www.patrimonionacional.es/en/real-sitio/monasterio-de-san-lorenzo-de-el-escorial" target="_blank">info</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="week-section">
+                    <h3>Week 2 — Andalucía</h3>
+                    
+                    <div class="day" data-day="8" data-city="seville">
+                        <div class="day-header">
+                            <h4>Day 8 — Madrid → Seville</h4>
+                            <div class="travel-info">
+                                <i class="fas fa-train"></i> 2h30 AVE high-speed train
+                                <button class="book-transport-btn" data-route="madrid-seville" title="Book train">
+                                    <i class="fas fa-ticket-alt"></i>
+                                </button>
+                            </div>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-8-1">
+                                    <span class="activity-text">Check in; evening in Santa Cruz Quarter</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-8-2">
+                                    <span class="activity-text">Tapas at El Rinconcillo (historic bar)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="9" data-city="seville">
+                        <div class="day-header">
+                            <h4>Day 9 — Seville — Cathedral & Alcázar</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-9-1">
+                                    <span class="activity-text"><a href="https://www.catedraldesevilla.es/" target="_blank">Seville Cathedral & Giralda</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-9-2">
+                                    <span class="activity-text"><a href="https://www.alcazarsevilla.org/" target="_blank">Real Alcázar</a> (reserve timed entry)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-9-3">
+                                    <span class="activity-text"><a href="https://www.lacasadelflamenco.com/" target="_blank">La Casa del Flamenco</a> in the evening</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="10" data-city="seville">
+                        <div class="day-header">
+                            <h4>Day 10 — Seville — Las Setas & Riverside</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-10-1">
+                                    <span class="activity-text">Metropol Parasol (Las Setas) · River walk</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-10-2">
+                                    <span class="activity-text">Triana neighborhood (ceramics & tapas)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-10-3">
+                                    <span class="activity-text">Optional guided walk: <a href="https://www.guruwalk.com/seville" target="_blank">GuruWalk Seville</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="11" data-city="cordoba">
+                        <div class="day-header">
+                            <h4>Day 11 — Córdoba</h4>
+                            <div class="travel-info">
+                                <i class="fas fa-train"></i> 45 min from Seville
+                                <button class="book-transport-btn" data-route="seville-cordoba" title="Book train">
+                                    <i class="fas fa-ticket-alt"></i>
+                                </button>
+                            </div>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-11-1">
+                                    <span class="activity-text">Train Seville → Córdoba (45 min)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-11-2">
+                                    <span class="activity-text"><a href="https://mezquita-catedraldecordoba.es/en/" target="_blank">Mezquita</a> · Judería · Roman Bridge</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="12" data-city="granada">
+                        <div class="day-header">
+                            <h4>Day 12 — Córdoba → Granada</h4>
+                            <div class="travel-info">
+                                <i class="fas fa-train"></i> 2h train (or bus)
+                                <button class="book-transport-btn" data-route="cordoba-granada" title="Book train">
+                                    <i class="fas fa-ticket-alt"></i>
+                                </button>
+                            </div>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-12-1">
+                                    <span class="activity-text">Evening in Albaicín Quarter</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-12-2">
+                                    <span class="activity-text">Dinner with Alhambra views: <a href="https://www.abengourmet.com/abenhumeya" target="_blank">Carmen de Aben Humeya</a></span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="13" data-city="granada">
+                        <div class="day-header">
+                            <h4>Day 13 — Granada — Alhambra</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-13-1">
+                                    <span class="activity-text"><a href="https://tickets.alhambra-patronato.es/en/" target="_blank">Alhambra + Generalife</a> (book ahead)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-13-2">
+                                    <span class="activity-text">Cathedral & Royal Chapel</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                                <li class="activity-item" data-id="act-13-3">
+                                    <span class="activity-text">Tapas crawl (free tapas with drinks!)</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="14" data-city="madrid">
+                        <div class="day-header">
+                            <h4>Day 14 — Granada → Madrid</h4>
+                            <div class="travel-info">
+                                <i class="fas fa-train"></i> 3h30 train
+                                <button class="book-transport-btn" data-route="granada-madrid" title="Book train">
+                                    <i class="fas fa-ticket-alt"></i>
+                                </button>
+                            </div>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-14-1">
+                                    <span class="activity-text">Travel back to Madrid; stay near Atocha or airport</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+
+                    <div class="day" data-day="15" data-city="madrid">
+                        <div class="day-header">
+                            <h4>Day 15 — Departure</h4>
+                            <div class="day-controls">
+                                <button class="edit-day-btn" title="Edit day"><i class="fas fa-edit"></i></button>
+                                <button class="toggle-btn">−</button>
+                            </div>
+                        </div>
+                        <div class="day-content">
+                            <ul class="activity-list">
+                                <li class="activity-item" data-id="act-15-1">
+                                    <span class="activity-text">Transfer to Madrid-Barajas Airport</span>
+                                    <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
+                                </li>
+                            </ul>
+                            <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="print-btn"><i class="fas fa-print"></i> Print Itinerary</button>
+            </div>
+        </div>
+
+        <!-- Hotels Tab -->
+        <div class="tab-content" id="hotels-tab">
+            <div class="hotels-section">
+                <h2>Hotel Selection</h2>
+                <p class="hotels-intro">Choose hotels for each city. Selected hotels will be added to your itinerary.</p>
+
+                <div class="hotel-city-section">
+                    <h3>Madrid (Week 1 Base)</h3>
+                    <div class="hotel-grid">
+                        <div class="hotel-card" data-city="madrid-week1" data-hotel-name="Hotel Catalonia Atocha">
+                            <h4>Hotel Catalonia Atocha</h4>
+                            <p class="hotel-price">~€130–150/night</p>
+                            <p class="hotel-description">Central location, easy access to Atocha station & museums</p>
+                            <div class="hotel-actions">
+                                <a href="https://www.cataloniahotels.com/en/hotel/catalonia-atocha" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                        <div class="hotel-card" data-city="madrid-week1" data-hotel-name="Hotel Regina">
+                            <h4>Hotel Regina</h4>
+                            <p class="hotel-price">~€140/night</p>
+                            <p class="hotel-description">Near Puerta del Sol, great value for money</p>
+                            <div class="hotel-actions">
+                                <a href="https://www.hotelreginamadrid.com/en/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                        <div class="hotel-card" data-city="madrid-week1" data-hotel-name="Petit Palace Lealtad Plaza">
+                            <h4>Petit Palace Lealtad Plaza</h4>
+                            <p class="hotel-price">~€110/night</p>
+                            <p class="hotel-description">By Retiro Park, solid budget-mid option</p>
+                            <div class="hotel-actions">
+                                <a href="https://www.petitpalace.com/en/hotels/madrid/petit-palace-lealtad-plaza/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hotel-city-section">
+                    <h3>Seville (3 nights)</h3>
+                    <div class="hotel-grid">
+                        <div class="hotel-card" data-city="seville" data-hotel-name="Hotel Amadeus Sevilla">
+                            <h4>Hotel Amadeus Sevilla</h4>
+                            <p class="hotel-price">~€120/night</p>
+                            <p class="hotel-description">Boutique hotel with rooftop views</p>
+                            <div class="hotel-actions">
+                                <a href="https://hotelamadeussevilla.com/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                        <div class="hotel-card" data-city="seville" data-hotel-name="Las Casas de la Judería">
+                            <h4>Las Casas de la Judería</h4>
+                            <p class="hotel-price">~€100–120/night</p>
+                            <p class="hotel-description">Atmospheric maze of patios in historic quarter</p>
+                            <div class="hotel-actions">
+                                <a href="https://www.lascasasdelajuderiahotel.com/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hotel-city-section">
+                    <h3>Córdoba (1 night)</h3>
+                    <div class="hotel-grid">
+                        <div class="hotel-card" data-city="cordoba" data-hotel-name="NH Collection Amistad Córdoba">
+                            <h4>NH Collection Amistad Córdoba</h4>
+                            <p class="hotel-price">~€130/night</p>
+                            <p class="hotel-description">Historic setting by the Mezquita</p>
+                            <div class="hotel-actions">
+                                <a href="https://www.nh-hotels.com/hotel/nh-collection-amistad-cordoba" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                        <div class="hotel-card" data-city="cordoba" data-hotel-name="Soho Boutique Córdoba">
+                            <h4>Soho Boutique Córdoba</h4>
+                            <p class="hotel-price">~€100/night</p>
+                            <p class="hotel-description">Modern and well-priced option</p>
+                            <div class="hotel-actions">
+                                <a href="https://sohoboutiquehoteles.com/en/soho-boutique-cordoba/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hotel-city-section">
+                    <h3>Granada (2–3 nights)</h3>
+                    <div class="hotel-grid">
+                        <div class="hotel-card" data-city="granada" data-hotel-name="Hotel Anacapri">
+                            <h4>Hotel Anacapri</h4>
+                            <p class="hotel-price">~€110/night</p>
+                            <p class="hotel-description">Cozy hotel near the Cathedral</p>
+                            <div class="hotel-actions">
+                                <a href="https://www.hotelanacapri.com/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                        <div class="hotel-card" data-city="granada" data-hotel-name="Palacio de Santa Inés">
+                            <h4>Palacio de Santa Inés</h4>
+                            <p class="hotel-price">~€120–140/night</p>
+                            <p class="hotel-description">Albaicín boutique with Alhambra views</p>
+                            <div class="hotel-actions">
+                                <a href="https://palaciosantaines.es/en/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hotel-city-section">
+                    <h3>Madrid (Final Night)</h3>
+                    <div class="hotel-grid">
+                        <div class="hotel-card" data-city="madrid-final" data-hotel-name="Only YOU Hotel Atocha">
+                            <h4>Only YOU Hotel Atocha</h4>
+                            <p class="hotel-price">~€140/night</p>
+                            <p class="hotel-description">Across from Atocha station, perfect for departure</p>
+                            <div class="hotel-actions">
+                                <a href="https://www.onlyyouhotels.com/en/hotels/only-you-hotel-atocha/" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                        <div class="hotel-card" data-city="madrid-final" data-hotel-name="Ibis Styles Madrid Prado">
+                            <h4>Ibis Styles Madrid Prado</h4>
+                            <p class="hotel-price">~€110/night</p>
+                            <p class="hotel-description">Value option, central location</p>
+                            <div class="hotel-actions">
+                                <a href="https://all.accor.com/hotel/3310/index.en.shtml" target="_blank" class="hotel-link">View Hotel</a>
+                                <button class="select-hotel-btn">Select</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Tab -->
+        <div class="tab-content" id="search-tab">
+            <div class="search-section">
+                <h2>Discover Spain</h2>
+                <p class="search-intro">Tell us what you're interested in and which city, and we'll suggest amazing activities for your trip!</p>
+                
+                <div class="ai-search-controls">
+                    <div class="search-input-group">
+                        <input type="text" id="ai-search-input" placeholder="e.g., 'rooftop bars', 'art galleries', 'traditional food experiences', 'hidden gems'...">
+                        <select id="city-select" class="city-select" required>
+                            <option value="">Select City</option>
+                            <option value="madrid">Madrid</option>
+                            <option value="seville">Seville</option>
+                            <option value="cordoba">Córdoba</option>
+                            <option value="granada">Granada</option>
+                            <option value="toledo">Toledo</option>
+                            <option value="segovia">Segovia</option>
+                            <option value="avila">Ávila</option>
+                        </select>
+                        <button id="ai-search-btn"><i class="fas fa-magic"></i> Discover</button>
+                    </div>
+                </div>
+
+                <div class="search-results" id="search-results">
+                    <!-- API Setup Instructions -->
+                    <div style="text-align: center; padding: 40px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 10px; margin: 20px 0;">
+                        <h3 style="color: #667eea; margin-bottom: 20px;">🔍 Live Recommendations Ready!</h3>
+                        <p style="color: #666; margin-bottom: 15px;">Enter a search term above to discover amazing places with photos, ratings, and reviews powered by Google.</p>
+                        <p style="color: #888; font-size: 14px;">Try searching for: restaurants, museums, bars, cafes, attractions, or specific cuisine types</p>
+                    </div>
+                </div>
+
+                <div class="search-examples">
+                    <h3>Need inspiration? Try these searches:</h3>
+                    <div class="example-chips">
+                        <button class="example-chip" data-search="rooftop bars" data-city="madrid">Rooftop bars in Madrid</button>
+                        <button class="example-chip" data-search="flamenco shows" data-city="seville">Flamenco shows in Seville</button>
+                        <button class="example-chip" data-search="traditional tapas" data-city="granada">Traditional tapas in Granada</button>
+                        <button class="example-chip" data-search="historic baths" data-city="cordoba">Historic baths in Córdoba</button>
+                        <button class="example-chip" data-search="art galleries" data-city="madrid">Art galleries in Madrid</button>
+                        <button class="example-chip" data-search="hidden gems" data-city="seville">Hidden gems in Seville</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- To-Do Tab -->
+        <div class="tab-content" id="todos-tab">
+            <div class="todos-section">
+                <h2>Trip Preparation To-Do List</h2>
+                <p class="todos-intro">Keep track of everything you need to do before your trip. Check off items as you complete them!</p>
+
+                <div class="todo-categories">
+                    <div class="todo-category">
+                        <h3><i class="fas fa-plane"></i> Flights & Transportation</h3>
+                        <div class="todo-items">
+                            <div class="todo-item" data-id="book-flights">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book round-trip flights to Madrid</span>
+                                </label>
+                                <span class="todo-priority high">High Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="madrid-seville-train">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book AVE train: Madrid → Seville (2h30)</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="seville-cordoba-train">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book train: Seville → Córdoba (45 min)</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="cordoba-granada-train">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book train: Córdoba → Granada (2h)</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="granada-madrid-train">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book train: Granada → Madrid (3h30)</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="todo-category">
+                        <h3><i class="fas fa-bed"></i> Accommodation</h3>
+                        <div class="todo-items">
+                            <div class="todo-item" data-id="book-madrid-hotel">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book Madrid hotel (7 nights)</span>
+                                </label>
+                                <span class="todo-priority high">High Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="book-seville-hotel">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book Seville hotel (3 nights)</span>
+                                </label>
+                                <span class="todo-priority high">High Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="book-cordoba-hotel">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book Córdoba hotel (1 night)</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="book-granada-hotel">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book Granada hotel (3 nights)</span>
+                                </label>
+                                <span class="todo-priority high">High Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="book-madrid-final-hotel">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Book Madrid final night hotel (1 night)</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="todo-category">
+                        <h3><i class="fas fa-ticket-alt"></i> Attraction Reservations</h3>
+                        <div class="todo-items">
+                            <div class="todo-item" data-id="alhambra-tickets">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Reserve Alhambra tickets (MUST book in advance!)</span>
+                                </label>
+                                <span class="todo-priority high">Critical</span>
+                            </div>
+                            <div class="todo-item" data-id="alcazar-seville">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Reserve Alcázar Seville timed entry</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="prado-tickets">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Buy Prado Museum tickets</span>
+                                </label>
+                                <span class="todo-priority low">Low Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="reina-sofia-tickets">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Buy Reina Sofía Museum tickets</span>
+                                </label>
+                                <span class="todo-priority low">Low Priority</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="todo-category">
+                        <h3><i class="fas fa-passport"></i> Travel Documents & Prep</h3>
+                        <div class="todo-items">
+                            <div class="todo-item" data-id="check-passport">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Check passport expiration date</span>
+                                </label>
+                                <span class="todo-priority high">High Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="travel-insurance">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Purchase travel insurance</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="notify-bank">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Notify bank of international travel</span>
+                                </label>
+                                <span class="todo-priority medium">Medium Priority</span>
+                            </div>
+                            <div class="todo-item" data-id="download-apps">
+                                <label class="todo-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="todo-text">Download offline maps & translation app</span>
+                                </label>
+                                <span class="todo-priority low">Low Priority</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="completion-summary">
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span class="progress-text" id="progress-text">0 of 17 completed (0%)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding/editing activities -->
+    <div class="modal" id="activity-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Add Activity</h3>
+            <input type="text" id="activity-input" placeholder="Enter activity description">
+            <div class="modal-buttons">
+                <button id="modal-save">Save</button>
+                <button id="modal-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for editing day title -->
+    <div class="modal" id="day-modal">
+        <div class="modal-content">
+            <h3>Edit Day</h3>
+            <input type="text" id="day-title-input" placeholder="Day title">
+            <div class="modal-buttons">
+                <button id="day-modal-save">Save</button>
+                <button id="day-modal-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for selecting day when adding activity -->
+    <div class="modal" id="day-selector-modal">
+        <div class="modal-content">
+            <h3>Select Day for Activity</h3>
+            <div class="day-selector-list" id="day-selector-list">
+                <!-- Days will be populated dynamically -->
+            </div>
+            <div class="modal-buttons">
+                <button id="day-selector-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for setting trip dates -->
+    <div class="modal" id="dates-modal">
+        <div class="modal-content">
+            <h3>Set Your Trip Dates</h3>
+            <div class="dates-input-section">
+                <div class="date-input-group">
+                    <label for="start-date">Start Date:</label>
+                    <input type="date" id="start-date" class="date-input">
+                </div>
+                <div class="date-input-group">
+                    <label for="end-date">End Date:</label>
+                    <input type="date" id="end-date" class="date-input">
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="dates-save">Save Dates</button>
+                <button id="dates-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for editing city duration -->
+    <div class="modal" id="city-duration-modal">
+        <div class="modal-content">
+            <h3 id="city-duration-title">Edit Stay Duration</h3>
+            <div class="duration-input-section">
+                <label for="nights-input">Number of nights:</label>
+                <input type="number" id="nights-input" class="duration-input" min="1" max="10">
+                <p class="duration-info">Current: <span id="current-nights"></span> nights</p>
+                <p class="duration-limits">Allowed range: <span id="nights-range"></span> nights</p>
+            </div>
+            <div id="activity-selection" class="activity-selection" style="display: none;">
+                <h4>Select activities to keep when reducing stay:</h4>
+                <div id="activity-selection-list" class="activity-selection-list">
+                    <!-- Activities will be populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="duration-save">Save Changes</button>
+                <button id="duration-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <a href="#" id="activity-log-link" class="footer-link">
+                <i class="fas fa-history"></i> View Activity Log
+            </a>
+        </div>
+    </footer>
+    
+    <script src="script.js"></script>
+</body>
+</html>

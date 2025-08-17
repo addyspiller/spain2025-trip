@@ -76,8 +76,8 @@ function build() {
         fs.mkdirSync(distDir);
     }
     
-    // Copy and process HTML file
-    const htmlContent = replacePlaceholders('index.html', env);
+    // Copy and process HTML file from template
+    const htmlContent = replacePlaceholders('index.template.html', env);
     fs.writeFileSync(path.join(distDir, 'index.html'), htmlContent);
     
     // Copy and process JS file

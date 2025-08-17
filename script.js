@@ -204,8 +204,9 @@ function setupEventListeners() {
             } else {
                 // This is an activity selection
                 const activity = e.target.getAttribute('data-activity');
+                const activityUrl = e.target.getAttribute('data-activity-url');
                 const city = e.target.closest('.suggestion-card').getAttribute('data-city');
-                showDaySelectorModal(activity, city);
+                showDaySelectorModal(activity, city, activityUrl);
             }
         }
     });
@@ -451,7 +452,33 @@ function restoreHotelSelections() {
         if (hotelName) {
             console.log(`Restoring: ${hotelName} for ${cityId}`);
             updateItineraryHotelDisplay(hotelName, cityId);
+            
+            // Also restore visual state in Hotels tab
+            restoreHotelTabSelection(cityId, hotelName);
         }
+    }
+}
+
+function restoreHotelTabSelection(cityId, hotelName) {
+    // Find the hotel card in the Hotels tab
+    const hotelCard = document.querySelector(`.hotel-card[data-city="${cityId}"][data-hotel-name="${hotelName}"]`);
+    
+    if (hotelCard) {
+        // Remove selected class from other hotels in same city
+        document.querySelectorAll(`.hotel-card[data-city="${cityId}"]`).forEach(card => {
+            card.classList.remove('selected');
+            const btn = card.querySelector('.select-hotel-btn');
+            if (btn) btn.textContent = 'Select';
+        });
+        
+        // Add selected class to this hotel
+        hotelCard.classList.add('selected');
+        const btn = hotelCard.querySelector('.select-hotel-btn');
+        if (btn) btn.textContent = 'Selected';
+        
+        console.log(`Restored Hotels tab selection: ${hotelName} for ${cityId}`);
+    } else {
+        console.log(`Could not find hotel card for ${hotelName} in ${cityId}`);
     }
 }
 
@@ -697,7 +724,7 @@ function setupModalControls() {
     document.getElementById('regenerate-itinerary').addEventListener('click', regenerateItinerary);
 }
 
-function addActivity(day, text) {
+function addActivity(day, text, url = '') {
     const activityList = day.querySelector('.activity-list');
     const dayNum = day.getAttribute('data-day');
     const activityId = `act-custom-${itineraryData.activityCounter++}`;
@@ -705,8 +732,14 @@ function addActivity(day, text) {
     const li = document.createElement('li');
     li.className = 'activity-item';
     li.setAttribute('data-id', activityId);
+    
+    // Create activity text with optional link
+    const activityContent = url ? 
+        `<a href="${url}" target="_blank">${text}</a>` : 
+        text;
+    
     li.innerHTML = `
-        <span class="activity-text">${text}</span>
+        <span class="activity-text">${activityContent}</span>
         <button class="remove-activity" title="Remove"><i class="fas fa-times"></i></button>
     `;
     
@@ -1525,7 +1558,7 @@ function displaySearchResults(results) {
                                 <i class="fas fa-map-marker-alt"></i> View on Maps
                             </a>` : '')
                     }
-                    <button class="add-to-itinerary" data-activity="${activityText}">
+                    <button class="add-to-itinerary" data-activity="${activityText}" data-activity-url="${result.place_id ? `https://www.google.com/maps/place/?q=place_id:${result.place_id}` : ''}">
                         <i class="fas fa-plus"></i> Add to Itinerary
                     </button>
                 </div>
@@ -1536,7 +1569,7 @@ function displaySearchResults(results) {
     container.innerHTML = `<div class="suggestions-grid">${html}</div>`;
 }
 
-function showDaySelectorModal(activity, suggestedCity) {
+function showDaySelectorModal(activity, suggestedCity, activityUrl = '') {
     const modal = document.getElementById('day-selector-modal');
     const list = document.getElementById('day-selector-list');
     
@@ -1592,7 +1625,7 @@ function showDaySelectorModal(activity, suggestedCity) {
         `;
         
         item.addEventListener('click', function() {
-            addActivity(day, activity);
+            addActivity(day, activity, activityUrl);
             modal.classList.remove('active');
             showNotification(`Added "${activity}" to ${dayTitle}!`);
         });
@@ -2076,13 +2109,42 @@ function updateTripDatesDisplay() {
         const startFormatted = startDate.toLocaleDateString('en-US', formatOptions);
         const endFormatted = endDate.toLocaleDateString('en-US', formatOptions);
         
-        display.textContent = `${startFormatted} - ${endFormatted}`;
+        display.innerHTML = `${startFormatted} - ${endFormatted} <button id="clear-dates-btn" class="clear-dates-btn" title="Clear dates"><i class="fas fa-times"></i></button>`;
         display.style.display = 'inline';
         button.innerHTML = '<i class="fas fa-edit"></i> Edit Dates';
+        
+        // Add event listener for clear button
+        const clearBtn = document.getElementById('clear-dates-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', clearTripDates);
+        }
     } else {
         display.style.display = 'none';
         button.innerHTML = '<i class="fas fa-calendar-alt"></i> Set Trip Dates';
     }
+}
+
+function clearTripDates() {
+    if (confirm('Are you sure you want to clear the trip dates?')) {
+        itineraryData.tripDates.startDate = null;
+        itineraryData.tripDates.endDate = null;
+        updateTripDatesDisplay();
+        clearDayDates();
+        saveData();
+        showNotification('Trip dates cleared!');
+    }
+}
+
+function clearDayDates() {
+    // Remove date information from day headers
+    const days = document.querySelectorAll('.day');
+    days.forEach(day => {
+        const header = day.querySelector('.day-header h4');
+        if (header) {
+            // Remove any date suffix like " (Mon 3/15)"
+            header.textContent = header.textContent.replace(/ \([^)]+\)$/, '');
+        }
+    });
 }
 
 function updateDayDates() {

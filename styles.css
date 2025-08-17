@@ -126,6 +126,23 @@ header {
     margin-left: 15px;
 }
 
+.clear-dates-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 10px;
+    transition: background-color 0.3s ease;
+    vertical-align: middle;
+}
+
+.clear-dates-btn:hover {
+    background-color: #c0392b;
+}
+
 .dates-input-section {
     display: flex;
     gap: 20px;
@@ -222,11 +239,12 @@ h4 {
 }
 
 a {
-    color: #e74c3c;
+    color: #3498db;
     text-decoration: none;
 }
 
 a:hover {
+    color: #2980b9;
     text-decoration: underline;
 }
 
