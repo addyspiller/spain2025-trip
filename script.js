@@ -1,4 +1,4 @@
-// Firebase configuration - loaded from secrets.js
+// Firebase configuration - loaded from inline config in HTML
 const firebaseConfig = window.API_CONFIG.firebase;
 
 // Initialize Firebase
