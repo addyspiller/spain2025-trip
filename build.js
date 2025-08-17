@@ -59,9 +59,15 @@ function build() {
     fs.copyFileSync('styles.css', path.join(distDir, 'styles.css'));
     
     // Copy other assets
-    if (fs.existsSync('spainflag.png')) {
-        fs.copyFileSync('spainflag.png', path.join(distDir, 'spainflag.png'));
-    }
+    const assetsToCopy = ['spainflag.png'];
+    assetsToCopy.forEach(asset => {
+        if (fs.existsSync(asset)) {
+            fs.copyFileSync(asset, path.join(distDir, asset));
+            console.log(`✓ Copied ${asset}`);
+        } else {
+            console.warn(`⚠️  Asset not found: ${asset}`);
+        }
+    });
     
     console.log('✅ Build complete! Files are in the dist/ directory.');
     console.log('🚀 Run: cd dist && python3 -m http.server 8000');
