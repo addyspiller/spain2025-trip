@@ -7,7 +7,7 @@ const database = firebase.database();
 
 // Use a single shared trip for everyone
 const tripId = 'silvia-irene-spain-2025';
-console.log('Using shared trip:', tripId);
+// console.log('Using shared trip:', tripId);
 
 // State management
 let itineraryData = {
@@ -44,7 +44,7 @@ let saveTimeout = null;
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM ready - App initializing...');
+    // console.log('DOM ready - App initializing...');
     domReady = true;
     
     // Initialize everything except hotels
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeCityManagement();
         restoreHotelSelections(); // Restore any saved hotel selections
         
-        console.log('App base initialization complete!');
+        // console.log('App base initialization complete!');
         
         // Try to load hotels if Google Maps is already ready
         tryLoadHotels();
@@ -72,10 +72,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // Make tryLoadHotels globally accessible for the early initMap callback
 window.tryLoadHotels = function tryLoadHotels() {
     if (domReady && googleMapsReady) {
-        console.log('Both DOM and Google Maps ready - loading hotels!');
+        // console.log('Both DOM and Google Maps ready - loading hotels!');
         loadHotelsForAllCities();
     } else {
-        console.log(`Waiting... DOM ready: ${domReady}, Google Maps ready: ${googleMapsReady}`);
+        // console.log(`Waiting... DOM ready: ${domReady}, Google Maps ready: ${googleMapsReady}`);
     }
 }
 
@@ -346,7 +346,7 @@ function getDeviceType(userAgent) {
 
 // Select hotel for itinerary
 function selectHotelForItinerary(hotelName, cityId, buttonElement) {
-    console.log(`Selecting hotel: ${hotelName} for city: ${cityId}`);
+    // console.log(`Selecting hotel: ${hotelName} for city: ${cityId}`);
     
     // Update the itinerary tab hotel display
     updateItineraryHotelDisplay(hotelName, cityId);
@@ -356,7 +356,7 @@ function selectHotelForItinerary(hotelName, cityId, buttonElement) {
     
     // Store selection in state
     itineraryData.selectedHotels[cityId] = hotelName;
-    console.log(`Stored hotel selection:`, itineraryData.selectedHotels);
+    // console.log(`Stored hotel selection:`, itineraryData.selectedHotels);
     
     // Show success message
     const cityName = getCityDisplayName(cityId);
@@ -433,15 +433,15 @@ function getCityDisplayName(cityId) {
 // Restore hotel selections from saved data
 function restoreHotelSelections() {
     if (!itineraryData.selectedHotels) {
-        console.log('No saved hotel selections found');
+        // console.log('No saved hotel selections found');
         return;
     }
     
-    console.log('Restoring hotel selections:', itineraryData.selectedHotels);
+    // console.log('Restoring hotel selections:', itineraryData.selectedHotels);
     
     for (const [cityId, hotelName] of Object.entries(itineraryData.selectedHotels)) {
         if (hotelName) {
-            console.log(`Restoring: ${hotelName} for ${cityId}`);
+            // console.log(`Restoring: ${hotelName} for ${cityId}`);
             updateItineraryHotelDisplay(hotelName, cityId);
             
             // Also restore visual state in Hotels tab
@@ -467,7 +467,7 @@ function restoreHotelTabSelection(cityId, hotelName) {
         const btn = hotelCard.querySelector('.select-hotel-btn');
         if (btn) btn.textContent = 'Selected';
         
-        console.log(`Restored Hotels tab selection: ${hotelName} for ${cityId}`);
+        // console.log(`Restored Hotels tab selection: ${hotelName} for ${cityId}`);
     } else {
         console.log(`Could not find hotel card for ${hotelName} in ${cityId}`);
     }
@@ -937,7 +937,7 @@ async function loadHotelsForAllCities() {
 
 // Search for hotels using Google Places (fallback to hardcoded for now)
 async function searchGooglePlacesHotels(cityId, cityName) {
-    console.log(`Attempting to search for boutique hotels in ${cityName}...`);
+    // console.log(`Attempting to search for boutique hotels in ${cityName}...`);
     
     // Since Google Places Service is deprecated for new customers, 
     // we'll return hardcoded boutique hotels for now
@@ -1114,33 +1114,33 @@ function getPriceDescription(priceLevel) {
 
 // Display hotels for a specific city
 function displayHotelsForCity(city, hotels) {
-    console.log(`Displaying hotels for city: ${city.name} (ID: ${city.id}), hotel count: ${hotels.length}`);
+    // console.log(`Displaying hotels for city: ${city.name} (ID: ${city.id}), hotel count: ${hotels.length}`);
     
     // Find existing hotel section by looking for the city name in h3 headers
     const allSections = document.querySelectorAll('.hotel-city-section');
     let citySection = null;
     
-    console.log(`Found ${allSections.length} hotel sections in HTML`);
+    // console.log(`Found ${allSections.length} hotel sections in HTML`);
     
     for (const section of allSections) {
         const h3 = section.querySelector('h3');
         if (h3) {
-            console.log(`Checking section with header: "${h3.textContent}"`);
+            // console.log(`Checking section with header: "${h3.textContent}"`);
             // Handle Madrid final night specifically
             if (city.id === 'madrid-final' && h3.textContent.includes('Final Night')) {
-                console.log(`Found Madrid Final Night section!`);
+                // console.log(`Found Madrid Final Night section!`);
                 citySection = section;
                 break;
             }
             // Handle regular Madrid (Week 1 Base)
             else if (city.id === 'madrid' && h3.textContent.includes('Week 1 Base')) {
-                console.log(`Found Madrid Week 1 Base section!`);
+                // console.log(`Found Madrid Week 1 Base section!`);
                 citySection = section;
                 break;
             }
             // Handle other cities
             else if (city.id !== 'madrid' && city.id !== 'madrid-final' && h3.textContent.includes(city.name)) {
-                console.log(`Found ${city.name} section!`);
+                // console.log(`Found ${city.name} section!`);
                 citySection = section;
                 break;
             }
