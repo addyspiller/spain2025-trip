@@ -34,9 +34,9 @@ let itineraryData = {
 // Global flag to track if Google Maps is loaded
 let googleMapsLoaded = false;
 
-// Global initialization flags
-let domReady = false;
-let googleMapsReady = false;
+// Global initialization flags (defined in HTML head)
+// let domReady = false; // Now defined in HTML
+// let googleMapsReady = false; // Now defined in HTML
 
 // Track if we're updating from Firebase to avoid loops
 let updatingFromFirebase = false;
