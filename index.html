@@ -9,6 +9,21 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="secrets.js"></script>
     <script>
+        // Initialize global variables and Google Maps callback early
+        let googleMapsReady = false;
+        let domReady = false;
+        
+        // Google Maps callback function - must be defined before loading the API
+        window.initMap = function() {
+            console.log('Google Maps API loaded successfully');
+            googleMapsReady = true;
+            
+            // Try to initialize if DOM is ready, otherwise wait for main script
+            if (window.tryLoadHotels) {
+                window.tryLoadHotels();
+            }
+        };
+        
         // Load Google Maps API with key from secrets
         (function() {
             const script = document.createElement('script');

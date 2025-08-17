@@ -69,17 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setupFirebaseListeners();
 });
 
-// Callback function for Google Maps API - must be global
-window.initMap = function() {
-    console.log('Google Maps API loaded successfully');
-    googleMapsReady = true;
-    
-    // Try to load hotels if DOM is ready
-    tryLoadHotels();
-}
-
-// Only load hotels when both DOM and Google Maps are ready
-function tryLoadHotels() {
+// Make tryLoadHotels globally accessible for the early initMap callback
+window.tryLoadHotels = function tryLoadHotels() {
     if (domReady && googleMapsReady) {
         console.log('Both DOM and Google Maps ready - loading hotels!');
         loadHotelsForAllCities();
