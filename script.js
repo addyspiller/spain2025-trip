@@ -1,7 +1,26 @@
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyBpQhBTpMgzinQlNJISd7Jm8uWxWXCxPao",
+    authDomain: "spain2025-9e7f6.firebaseapp.com",
+    databaseURL: "https://spain2025-9e7f6-default-rtdb.firebaseio.com",
+    projectId: "spain2025-9e7f6",
+    storageBucket: "spain2025-9e7f6.firebasestorage.app",
+    messagingSenderId: "921338138870",
+    appId: "1:921338138870:web:8d39742b119c198ebc5cd7",
+    measurementId: "G-6YRBJ1FFFY"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// Use a single shared trip for everyone
+const tripId = 'silvia-irene-spain-2025';
+console.log('Using shared trip:', tripId);
+
 // State management
 let itineraryData = {
     activities: {},
-    notes: {},
     dayTitles: {},
     collapsedDays: [],
     selectedHotels: {},
@@ -21,16 +40,61 @@ let itineraryData = {
     todoItems: {}
 };
 
+// Global flag to track if Google Maps is loaded
+let googleMapsLoaded = false;
+
+// Global initialization flags
+let domReady = false;
+let googleMapsReady = false;
+
+// Track if we're updating from Firebase to avoid loops
+let updatingFromFirebase = false;
+
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
-    loadSavedData();
+    console.log('DOM ready - App initializing...');
+    domReady = true;
+    
+    // Initialize everything except hotels
     setupEventListeners();
-    initializeActivities();
-    updateTripDatesDisplay();
-    initializeTodoItems();
-    updateTodoProgress();
-    initializeCityManagement();
+    
+    // Load data from Firebase
+    loadFromFirebase(() => {
+        initializeActivities();
+        updateTripDatesDisplay();
+        initializeTodoItems();
+        updateTodoProgress();
+        initializeCityManagement();
+        restoreHotelSelections(); // Restore any saved hotel selections
+        
+        console.log('App base initialization complete!');
+        
+        // Try to load hotels if Google Maps is already ready
+        tryLoadHotels();
+    });
+    
+    // Listen for real-time updates from Firebase
+    setupFirebaseListeners();
 });
+
+// Callback function for Google Maps API - must be global
+window.initMap = function() {
+    console.log('Google Maps API loaded successfully');
+    googleMapsReady = true;
+    
+    // Try to load hotels if DOM is ready
+    tryLoadHotels();
+}
+
+// Only load hotels when both DOM and Google Maps are ready
+function tryLoadHotels() {
+    if (domReady && googleMapsReady) {
+        console.log('Both DOM and Google Maps ready - loading hotels!');
+        loadHotelsForAllCities();
+    } else {
+        console.log(`Waiting... DOM ready: ${domReady}, Google Maps ready: ${googleMapsReady}`);
+    }
+}
 
 function setupEventListeners() {
     // Tab navigation
@@ -70,7 +134,22 @@ function setupEventListeners() {
     const addActivityBtns = document.querySelectorAll('.add-activity-btn');
     addActivityBtns.forEach(btn => {
         btn.addEventListener('click', function() {
-            showActivityModal(null, null);
+            // Get the city from the day container
+            const dayContainer = this.closest('.day');
+            const city = dayContainer.getAttribute('data-city');
+            
+            // Switch to discover tab
+            switchTab('search');
+            
+            // Pre-populate the city selector
+            if (city) {
+                document.getElementById('city-select').value = city;
+            }
+            
+            // Focus on search input for better UX
+            setTimeout(() => {
+                document.getElementById('ai-search-input').focus();
+            }, 100);
         });
     });
 
@@ -83,13 +162,6 @@ function setupEventListeners() {
         }
     });
 
-    // Notes
-    const noteTextareas = document.querySelectorAll('.day-notes');
-    noteTextareas.forEach(textarea => {
-        textarea.addEventListener('input', function() {
-            saveData();
-        });
-    });
 
     // Save and print buttons
     document.querySelector('.save-btn').addEventListener('click', function() {
@@ -132,9 +204,19 @@ function setupEventListeners() {
     // Add to itinerary buttons
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('add-to-itinerary')) {
-            const activity = e.target.getAttribute('data-activity');
-            const city = e.target.closest('.suggestion-card').getAttribute('data-city');
-            showDaySelectorModal(activity, city);
+            // Check if this is a hotel selection
+            const hotelName = e.target.getAttribute('data-hotel-name');
+            const cityId = e.target.getAttribute('data-city');
+            
+            if (hotelName && cityId) {
+                // This is a hotel selection
+                selectHotelForItinerary(hotelName, cityId, e.target);
+            } else {
+                // This is an activity selection
+                const activity = e.target.getAttribute('data-activity');
+                const city = e.target.closest('.suggestion-card').getAttribute('data-city');
+                showDaySelectorModal(activity, city);
+            }
         }
     });
 
@@ -143,6 +225,109 @@ function setupEventListeners() {
     
     // Setup drag and drop
     setupDragAndDrop();
+}
+
+// Select hotel for itinerary
+function selectHotelForItinerary(hotelName, cityId, buttonElement) {
+    console.log(`Selecting hotel: ${hotelName} for city: ${cityId}`);
+    
+    // Update the itinerary tab hotel display
+    updateItineraryHotelDisplay(hotelName, cityId);
+    
+    // Update button state
+    updateHotelButtonState(buttonElement, cityId);
+    
+    // Store selection in state
+    itineraryData.selectedHotels[cityId] = hotelName;
+    console.log(`Stored hotel selection:`, itineraryData.selectedHotels);
+    
+    // Show success message
+    const cityName = getCityDisplayName(cityId);
+    alert(`${hotelName} has been selected for your ${cityName} stay!`);
+    
+    // Save data
+    saveData();
+}
+
+// Update hotel display in itinerary tab
+function updateItineraryHotelDisplay(hotelName, cityId) {
+    // Map hotel cityId to itinerary table data-city values
+    const cityIdMapping = {
+        'madrid': 'madrid-week1',        // First Madrid stay
+        'madrid-final': 'madrid-final',  // Final Madrid stay  
+        'seville': 'seville',
+        'cordoba': 'cordoba',
+        'granada': 'granada'
+    };
+    
+    const itineraryCityId = cityIdMapping[cityId] || cityId;
+    
+    // Find the correct hotel cell in the summary table
+    const hotelCells = document.querySelectorAll('.hotel-cell');
+    
+    for (const cell of hotelCells) {
+        if (cell.getAttribute('data-city') === itineraryCityId) {
+            const placeholder = cell.querySelector('.hotel-placeholder');
+            if (placeholder) {
+                placeholder.textContent = hotelName;
+                cell.classList.add('selected');
+            }
+            break;
+        }
+    }
+}
+
+// Update button states for hotel selection
+function updateHotelButtonState(selectedButton, cityId) {
+    // Find the hotel section for this city
+    const citySection = findCitySectionByName({id: cityId, name: getCityDisplayName(cityId)});
+    if (!citySection) return;
+    
+    const hotelGrid = citySection.querySelector('.hotel-grid');
+    const allHotelButtons = hotelGrid.querySelectorAll('.add-to-itinerary[data-hotel-name]');
+    
+    // Reset all buttons in this city
+    allHotelButtons.forEach(btn => {
+        const icon = btn.querySelector('i');
+        btn.innerHTML = `${icon ? icon.outerHTML : '<i class="fas fa-plus"></i>'} Select Hotel`;
+        btn.classList.remove('selected');
+        btn.disabled = false;
+    });
+    
+    // Update selected button
+    const icon = selectedButton.querySelector('i');
+    selectedButton.innerHTML = `${icon ? icon.outerHTML : '<i class="fas fa-check"></i>'} Selected ✓`;
+    selectedButton.classList.add('selected');
+    selectedButton.disabled = true;
+}
+
+// Get display name for city
+function getCityDisplayName(cityId) {
+    const cityNames = {
+        'madrid': 'Madrid (Week 1)',
+        'madrid-final': 'Madrid (Final Night)',
+        'seville': 'Seville',
+        'cordoba': 'Córdoba', 
+        'granada': 'Granada'
+    };
+    return cityNames[cityId] || cityId;
+}
+
+// Restore hotel selections from saved data
+function restoreHotelSelections() {
+    if (!itineraryData.selectedHotels) {
+        console.log('No saved hotel selections found');
+        return;
+    }
+    
+    console.log('Restoring hotel selections:', itineraryData.selectedHotels);
+    
+    for (const [cityId, hotelName] of Object.entries(itineraryData.selectedHotels)) {
+        if (hotelName) {
+            console.log(`Restoring: ${hotelName} for ${cityId}`);
+            updateItineraryHotelDisplay(hotelName, cityId);
+        }
+    }
 }
 
 function switchTab(tabName) {
@@ -429,7 +614,22 @@ function selectHotel(city, hotelName, hotelCard) {
     saveData();
 }
 
-function performAISearch() {
+// Google Places API Configuration
+const GOOGLE_PLACES_API_KEY = 'AIzaSyCp9Q1buixo8BTH7d_nHdpc4-KYSoIz8Wc';
+const GOOGLE_PLACES_BASE_URL = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
+
+// City coordinates for Google Places API
+const CITY_COORDINATES = {
+    'madrid': '40.4168,-3.7038',
+    'seville': '37.3886,-5.9823',
+    'granada': '37.1773,-3.5986',
+    'cordoba': '37.8882,-4.7794',
+    'toledo': '39.8628,-4.0273',
+    'segovia': '40.9429,-4.1088',
+    'avila': '40.6566,-4.6776'
+};
+
+async function performAISearch() {
     const searchTerm = document.getElementById('ai-search-input').value.trim();
     const selectedCity = document.getElementById('city-select').value;
     
@@ -447,169 +647,769 @@ function performAISearch() {
     const container = document.getElementById('search-results');
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;"><i class="fas fa-spinner fa-spin"></i> Discovering amazing activities...</div>';
     
-    // Simulate AI search with contextual results
-    setTimeout(() => {
-        const aiResults = generateAIResults(searchTerm.toLowerCase(), selectedCity);
-        displaySearchResults(aiResults);
-    }, 1500);
+    try {
+        const results = await searchGooglePlaces(searchTerm, selectedCity);
+        displaySearchResults(results);
+    } catch (error) {
+        console.error('Search error:', error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #e74c3c;">
+                <h3>🚫 Search Error</h3>
+                <p>Unable to fetch recommendations at the moment.</p>
+                <p style="color: #666; font-size: 14px;">Please check your internet connection and try again.</p>
+            </div>
+        `;
+    }
 }
 
-function generateAIResults(searchTerm, city) {
-    // AI-powered suggestion database
-    const suggestions = {
-        madrid: {
-            'rooftop bars': [
-                { name: 'Círculo de Bellas Artes', desc: 'Iconic rooftop with 360° city views and cocktails', activity: 'Sunset drinks at Círculo de Bellas Artes rooftop', link: 'https://circulobellasartes.com/' },
-                { name: 'Gau&Café', desc: 'Trendy rooftop terrace in Malasaña district', activity: 'Evening cocktails at Gau&Café rooftop', link: 'https://www.gaucafe.es/' },
-                { name: 'Dear Hotel Sky Bar', desc: 'Sophisticated rooftop bar with city skyline views', activity: 'Cocktails at Dear Hotel Sky Bar', link: 'https://www.dearhotelmadrid.com/' }
-            ],
-            'art galleries': [
-                { name: 'Galería Marlborough', desc: 'Contemporary art gallery featuring Spanish artists', activity: 'Browse contemporary art at Galería Marlborough' },
-                { name: 'Galería Elvira González', desc: 'Modern art space in Salamanca district', activity: 'Visit Galería Elvira González' },
-                { name: 'La Casa Encendida', desc: 'Cultural center with rotating exhibitions', activity: 'Explore exhibitions at La Casa Encendida' }
-            ],
-            'traditional food': [
-                { name: 'Casa Botín', desc: 'World\'s oldest restaurant, famous for roast suckling pig', activity: 'Lunch at historic Casa Botín restaurant' },
-                { name: 'Taberna La Bola', desc: 'Traditional cocido madrileño since 1870', activity: 'Try cocido madrileño at Taberna La Bola' },
-                { name: 'Mercado de San Antón', desc: 'Gourmet market with traditional Spanish products', activity: 'Food tour at Mercado de San Antón' }
-            ],
-            'hidden gems': [
-                { name: 'Templo de Debod', desc: 'Authentic Egyptian temple relocated to Madrid', activity: 'Visit Templo de Debod at sunset' },
-                { name: 'El Capricho Park', desc: 'Secret 18th-century garden with peacocks', activity: 'Stroll through El Capricho Park' },
-                { name: 'Biblioteca Nacional', desc: 'Stunning reading rooms and exhibitions', activity: 'Explore Biblioteca Nacional' }
-            ]
-        },
-        seville: {
-            'flamenco shows': [
-                { name: 'Casa de la Memoria', desc: 'Intimate flamenco performances in historic venue', activity: 'Authentic flamenco show at Casa de la Memoria' },
-                { name: 'Tablao El Arenal', desc: 'Traditional tablao with passionate performances', activity: 'Dinner and flamenco at Tablao El Arenal' },
-                { name: 'La Casa del Flamenco', desc: 'Historic venue in Santa Cruz quarter', activity: 'Flamenco performance at La Casa del Flamenco' }
-            ],
-            'hidden gems': [
-                { name: 'Hospital de los Venerables', desc: 'Baroque church with Velázquez paintings', activity: 'Visit Hospital de los Venerables' },
-                { name: 'Casa de Pilatos', desc: 'Stunning mix of Mudéjar and Renaissance architecture', activity: 'Tour Casa de Pilatos palace' },
-                { name: 'Metropol Parasol', desc: 'Modern wooden structure with city views', activity: 'Explore Metropol Parasol walkways' }
-            ],
-            'traditional food': [
-                { name: 'El Rinconcillo', desc: 'Oldest tapas bar in Seville since 1670', activity: 'Tapas at historic El Rinconcillo' },
-                { name: 'Eslava', desc: 'Modern takes on traditional Andalusian cuisine', activity: 'Innovative tapas at Eslava' },
-                { name: 'Casa Morales', desc: 'Traditional sherry bar with authentic atmosphere', activity: 'Sherry tasting at Casa Morales' }
-            ]
-        },
-        granada: {
-            'traditional tapas': [
-                { name: 'Bodegas Castañeda', desc: 'Historic tavern with free tapas tradition', activity: 'Free tapas experience at Bodegas Castañeda' },
-                { name: 'Bar Los Diamantes', desc: 'Famous for fried fish and seafood tapas', activity: 'Seafood tapas at Bar Los Diamantes' },
-                { name: 'Taberna La Tana', desc: 'Wine bar with excellent local tapas', activity: 'Wine and tapas at Taberna La Tana' }
-            ],
-            'hidden gems': [
-                { name: 'Carmen de los Mártires', desc: 'Secret gardens with Alhambra views', activity: 'Explore Carmen de los Mártires gardens' },
-                { name: 'Cueva de las Ventanas', desc: 'Cave dwelling with panoramic views', activity: 'Visit Cueva de las Ventanas in Sacromonte' },
-                { name: 'Hammam Al Ándalus', desc: 'Traditional Arab baths experience', activity: 'Relax at Hammam Al Ándalus Arab baths' }
-            ],
-            'historic baths': [
-                { name: 'Hammam Al Ándalus', desc: 'Restored 11th-century Arab baths', activity: 'Traditional Arab bath experience at Hammam Al Ándalus' },
-                { name: 'Bañuelo', desc: 'Best-preserved medieval Arab baths in Spain', activity: 'Visit historic Bañuelo Arab baths' }
-            ]
-        },
-        cordoba: {
-            'historic baths': [
-                { name: 'Hammam Al Ándalus Córdoba', desc: 'Traditional Arab baths near the Mezquita', activity: 'Relaxing session at Hammam Al Ándalus' },
-                { name: 'Baños Califales', desc: 'Archaeological remains of Umayyad baths', activity: 'Explore Baños Califales ruins' }
-            ],
-            'hidden gems': [
-                { name: 'Palacio de Viana', desc: 'Palace with 12 beautiful courtyards', activity: 'Tour Palacio de Viana courtyards' },
-                { name: 'Museo Julio Romero de Torres', desc: 'Art museum dedicated to Córdoba painter', activity: 'Visit Julio Romero de Torres Museum' },
-                { name: 'Calleja de las Flores', desc: 'Picturesque narrow street with flower pots', activity: 'Photo walk through Calleja de las Flores' }
-            ]
-        },
-        toledo: {
-            'medieval sites': [
-                { name: 'Sinagoga del Tránsito', desc: 'Beautiful Mudéjar synagogue with museum', activity: 'Visit Sinagoga del Tránsito' },
-                { name: 'Monasterio de San Juan de los Reyes', desc: 'Gothic monastery with stunning cloisters', activity: 'Explore Monasterio de San Juan de los Reyes' },
-                { name: 'Mirador del Valle', desc: 'Panoramic viewpoint over Toledo', activity: 'Sunset views from Mirador del Valle' }
-            ]
-        },
-        segovia: {
-            'historic sites': [
-                { name: 'Casa de los Picos', desc: 'Unique 15th-century house with diamond facade', activity: 'Visit Casa de los Picos' },
-                { name: 'Iglesia de San Millán', desc: 'Romanesque church with beautiful architecture', activity: 'Explore Iglesia de San Millán' },
-                { name: 'Mirador de la Pradera de San Marcos', desc: 'Best views of the Alcázar', activity: 'Photography at Mirador de la Pradera' }
-            ]
-        },
-        avila: {
-            'medieval walls': [
-                { name: 'Murallas de Ávila', desc: 'Best-preserved medieval walls in Europe', activity: 'Walk along the medieval walls of Ávila' },
-                { name: 'Basílica de San Vicente', desc: 'Romanesque basilica outside the walls', activity: 'Visit Basílica de San Vicente' },
-                { name: 'Convento de Santa Teresa', desc: 'Convent built on Saint Teresa\'s birthplace', activity: 'Tour Convento de Santa Teresa' }
-            ]
+// Google Places JavaScript API search function (No CORS issues!)
+async function searchGooglePlaces(query, city) {
+    console.log('Making Google Places request...'); // Debug log
+    
+    return new Promise((resolve, reject) => {
+        const coordinates = CITY_COORDINATES[city];
+        if (!coordinates) {
+            reject(new Error('City not supported'));
+            return;
         }
+        
+        const [lat, lng] = coordinates.split(',');
+        const location = new google.maps.LatLng(parseFloat(lat), parseFloat(lng));
+        
+        // Create a map (required for Places service, but hidden)
+        const map = new google.maps.Map(document.createElement('div'));
+        
+        // Create Places service
+        const service = new google.maps.places.PlacesService(map);
+        
+        // Format the search query
+        const searchQuery = `${query} in ${city}, Spain`;
+        
+        const request = {
+            query: searchQuery,
+            location: location,
+            radius: 10000,
+            fields: ['name', 'formatted_address', 'rating', 'photos', 'website', 'formatted_phone_number', 'types', 'price_level', 'place_id']
+        };
+        
+        service.textSearch(request, (results, status) => {
+            console.log('Google Places API Response:', results, status); // Debug log
+            
+            if (status === google.maps.places.PlacesServiceStatus.OK) {
+                // Sort by rating (highest first), then by name
+                const sortedResults = (results || []).sort((a, b) => {
+                    if (a.rating && b.rating) {
+                        return b.rating - a.rating; // Higher rating first
+                    } else if (a.rating && !b.rating) {
+                        return -1; // Places with ratings come first
+                    } else if (!a.rating && b.rating) {
+                        return 1; // Places with ratings come first
+                    } else {
+                        return a.name.localeCompare(b.name); // Alphabetical if no ratings
+                    }
+                });
+                
+                resolve(formatGooglePlacesResults(sortedResults, city));
+            } else {
+                reject(new Error(`Google Places API error: ${status}`));
+            }
+        });
+    });
+}
+
+// Format Google Places results for display
+function formatGooglePlacesResults(places, city) {
+    return places.map(place => {
+        const category = place.types?.[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Attraction';
+        
+        // Get photo from Google Places JavaScript API
+        const photo = place.photos?.[0] ? 
+            place.photos[0].getUrl({ maxWidth: 300, maxHeight: 200 }) : 
+            getDefaultCityImage(city);
+        
+        const rating = place.rating ? `⭐ ${place.rating.toFixed(1)}` : '';
+        const price = place.price_level ? '💰'.repeat(place.price_level) : '';
+        const address = place.formatted_address || '';
+        
+        return {
+            title: place.name,
+            category: category,
+            description: `${address}${rating ? ` ${rating}` : ''}${price ? ` ${price}` : ''}`,
+            image: photo,
+            website: place.website,
+            phone: place.formatted_phone_number,
+            city: city,
+            source: 'google',
+            place_id: place.place_id // For Google Maps link if no website
+        };
+    });
+}
+
+// Default images for cities when no photo available
+function getDefaultCityImage(city) {
+    const defaultImages = {
+        'madrid': 'https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=300&h=200&fit=crop',
+        'seville': 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=200&fit=crop',
+        'granada': 'https://images.unsplash.com/photo-1566933293069-b55de3d3659c?w=300&h=200&fit=crop',
+        'cordoba': 'https://images.unsplash.com/photo-1590932103617-8f7df5d6dec9?w=300&h=200&fit=crop',
+        'toledo': 'https://images.unsplash.com/photo-1571298300660-fd3b55b8df19?w=300&h=200&fit=crop',
+        'segovia': 'https://images.unsplash.com/photo-1605034313761-73ea4a0cfbf3?w=300&h=200&fit=crop',
+        'avila': 'https://images.unsplash.com/photo-1551468294-635318fc27f8?w=300&h=200&fit=crop'
+    };
+    return defaultImages[city] || 'https://images.unsplash.com/photo-1508940140853-b9f37b5a1a61?w=300&h=200&fit=crop';
+}
+
+// Load hotels for all cities using Google Places
+async function loadHotelsForAllCities() {
+    // Check if Google Maps is loaded
+    if (!googleMapsReady || typeof google === 'undefined' || !google.maps || !google.maps.places) {
+        console.log('Google Maps not yet loaded, will retry when ready');
+        return;
+    }
+
+    const cities = [
+        { id: 'madrid', name: 'Madrid', nights: '7 nights' },
+        { id: 'seville', name: 'Seville', nights: '3 nights' },
+        { id: 'cordoba', name: 'Córdoba', nights: '1 night' },
+        { id: 'granada', name: 'Granada', nights: '3 nights' },
+        { id: 'madrid-final', name: 'Madrid', nights: 'Final Night' }
+    ];
+
+    for (const city of cities) {
+        try {
+            const hotels = await searchGooglePlacesHotels(city.id, city.name);
+            displayHotelsForCity(city, hotels);
+        } catch (error) {
+            console.error(`Error loading hotels for ${city.name}:`, error);
+            // Keep existing hardcoded hotels if API fails - they should already be in the HTML
+        }
+    }
+}
+
+// Search for hotels using Google Places (fallback to hardcoded for now)
+async function searchGooglePlacesHotels(cityId, cityName) {
+    console.log(`Attempting to search for boutique hotels in ${cityName}...`);
+    
+    // Since Google Places Service is deprecated for new customers, 
+    // we'll return hardcoded boutique hotels for now
+    const boutiqueHotels = {
+        'madrid': [
+            {
+                name: 'Hotel Villa Real',
+                rating: 4.4,
+                address: 'Plaza de las Cortes, 10, Madrid',
+                price: '€180-220/night',
+                website: 'https://www.derbyhotels.com/hotel-villa-real-madrid/',
+                phone: '+34 914 20 37 67',
+                place_id: 'madrid_villa_real',
+                photo: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=250&fit=crop'
+            },
+            {
+                name: 'Dear Hotel Madrid',
+                rating: 4.3,
+                address: 'Gran Vía, 80, Madrid',
+                price: '€160-200/night',
+                website: 'https://dearhotelmadrid.com/',
+                phone: '+34 914 12 32 00',
+                place_id: 'madrid_dear_hotel',
+                photo: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=400&h=250&fit=crop'
+            },
+            {
+                name: 'Only YOU Boutique Hotel',
+                rating: 4.2,
+                address: 'Barquillo, 21, Madrid',
+                price: '€140-180/night',
+                website: 'https://www.onlyyouhotels.com/madrid/',
+                phone: '+34 910 05 22 22',
+                place_id: 'madrid_only_you',
+                photo: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=400&h=250&fit=crop'
+            }
+        ],
+        'seville': [
+            {
+                name: 'Hotel Casa 1800 Sevilla',
+                rating: 4.5,
+                address: 'Rodrigo Caro, 6, Seville',
+                price: '€150-190/night',
+                website: 'https://www.hotelcasa1800sevilla.com/',
+                phone: '+34 954 56 18 00',
+                place_id: 'seville_casa_1800',
+                photo: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&h=250&fit=crop'
+            },
+            {
+                name: 'Corral del Rey',
+                rating: 4.3,
+                address: 'Corral del Rey, 12, Seville',
+                price: '€130-170/night',
+                website: 'https://www.corraldelrey.com/',
+                phone: '+34 954 22 71 16',
+                place_id: 'seville_corral_rey',
+                photo: 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=400&h=250&fit=crop'
+            },
+            {
+                name: 'Casa de Colón',
+                rating: 4.1,
+                address: 'Pedro Caravaca, 1, Seville',
+                price: '€120-160/night',
+                website: 'https://www.casadecolon.net/',
+                phone: '+34 954 50 59 99',
+                place_id: 'seville_casa_colon',
+                photo: 'https://images.unsplash.com/photo-1568495248636-6432b97bd949?w=400&h=250&fit=crop'
+            }
+        ],
+        'cordoba': [
+            {
+                name: 'Casa de los Azulejos',
+                rating: 4.4,
+                address: 'Fernando Colón, 5, Córdoba',
+                price: '€110-140/night',
+                website: 'https://www.casadelosazulejos.com/',
+                phone: '+34 957 47 00 00',
+                place_id: 'cordoba_azulejos',
+                photo: 'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=400&h=250&fit=crop'
+            }
+        ],
+        'granada': [
+            {
+                name: 'Casa Morisca Hotel',
+                rating: 4.3,
+                address: 'Cuesta de la Victoria, 9, Granada',
+                price: '€130-170/night',
+                website: 'https://www.hotelcasamorisca.com/',
+                phone: '+34 958 21 11 00',
+                place_id: 'granada_casa_morisca',
+                photo: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=400&h=250&fit=crop'
+            },
+            {
+                name: 'Palacio de los Patos',
+                rating: 4.2,
+                address: 'Solarillo de Gracia, 1, Granada',
+                price: '€160-200/night',
+                website: 'https://www.hospes.com/granada/',
+                phone: '+34 958 53 57 90',
+                place_id: 'granada_palacio_patos',
+                photo: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&h=250&fit=crop'
+            }
+        ],
+        'madrid-final': [
+            {
+                name: 'Hotel Único Madrid',
+                rating: 4.5,
+                address: 'Claudio Coello, 67, Madrid',
+                price: '€200-250/night',
+                website: 'https://www.hotelunicomadrid.com/',
+                phone: '+34 917 81 01 73',
+                place_id: 'madrid_unico',
+                photo: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400&h=250&fit=crop'
+            },
+            {
+                name: 'The Westin Palace Madrid',
+                rating: 4.4,
+                address: 'Plaza de las Cortes, 7, Madrid',
+                price: '€180-220/night',
+                website: 'https://www.marriott.com/hotels/travel/madwi-the-westin-palace-madrid/',
+                phone: '+34 913 60 80 00',
+                place_id: 'madrid_westin_palace',
+                photo: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=400&h=250&fit=crop'
+            },
+            {
+                name: 'Hotel Heritage Madrid',
+                rating: 4.2,
+                address: 'Serrano, 27, Madrid',
+                price: '€150-190/night',
+                website: 'https://www.hotelheritage.es/',
+                phone: '+34 914 35 76 11',
+                place_id: 'madrid_heritage',
+                photo: 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=400&h=250&fit=crop'
+            }
+        ]
     };
     
-    const cityData = suggestions[city] || {};
+    const cityKey = cityId;
+    const hotels = boutiqueHotels[cityKey] || [];
     
-    // Find matching categories
-    let results = [];
-    Object.keys(cityData).forEach(category => {
-        if (searchTerm.includes(category) || category.includes(searchTerm)) {
-            results = results.concat(cityData[category].map(item => ({
-                ...item,
-                city: city
-            })));
+    return formatHotelResults(hotels, cityId);
+}
+
+// Format hotel results for display
+function formatHotelResults(hotels, cityId) {
+    return hotels.map(hotel => {
+        const photo = hotel.photo || getDefaultCityImage(cityId);
+        const rating = hotel.rating ? `⭐ ${hotel.rating.toFixed(1)}` : '';
+        const price = hotel.price || 'Price varies';
+            
+        return {
+            name: hotel.name,
+            address: hotel.address || '',
+            rating: rating,
+            price: price,
+            photo: photo,
+            website: hotel.website,
+            phone: hotel.phone,
+            place_id: hotel.place_id,
+            cityId: cityId
+        };
+    });
+}
+
+// Get price level description
+function getPriceDescription(priceLevel) {
+    switch(priceLevel) {
+        case 1: return '(Budget)';
+        case 2: return '(Moderate)';
+        case 3: return '(Upscale)';
+        case 4: return '(Luxury)';
+        default: return '';
+    }
+}
+
+// Display hotels for a specific city
+function displayHotelsForCity(city, hotels) {
+    console.log(`Displaying hotels for city: ${city.name} (ID: ${city.id}), hotel count: ${hotels.length}`);
+    
+    // Find existing hotel section by looking for the city name in h3 headers
+    const allSections = document.querySelectorAll('.hotel-city-section');
+    let citySection = null;
+    
+    console.log(`Found ${allSections.length} hotel sections in HTML`);
+    
+    for (const section of allSections) {
+        const h3 = section.querySelector('h3');
+        if (h3) {
+            console.log(`Checking section with header: "${h3.textContent}"`);
+            // Handle Madrid final night specifically
+            if (city.id === 'madrid-final' && h3.textContent.includes('Final Night')) {
+                console.log(`Found Madrid Final Night section!`);
+                citySection = section;
+                break;
+            }
+            // Handle regular Madrid (Week 1 Base)
+            else if (city.id === 'madrid' && h3.textContent.includes('Week 1 Base')) {
+                console.log(`Found Madrid Week 1 Base section!`);
+                citySection = section;
+                break;
+            }
+            // Handle other cities
+            else if (city.id !== 'madrid' && city.id !== 'madrid-final' && h3.textContent.includes(city.name)) {
+                console.log(`Found ${city.name} section!`);
+                citySection = section;
+                break;
+            }
         }
+    }
+    
+    if (!citySection) {
+        citySection = createHotelCitySection(city);
+    }
+    
+    const hotelGrid = citySection.querySelector('.hotel-grid');
+    if (hotelGrid) {
+        hotelGrid.innerHTML = ''; // Clear existing hotels
+        
+        if (hotels.length === 0) {
+            hotelGrid.innerHTML = '<p>No boutique hotels found. Please check back later.</p>';
+            return;
+        }
+        
+        hotels.forEach(hotel => {
+            const hotelCard = createHotelCard(hotel);
+            hotelGrid.appendChild(hotelCard);
+        });
+        
+        // Add "Browse More Hotels" option
+        const browseMoreCard = createBrowseMoreCard(city);
+        hotelGrid.appendChild(browseMoreCard);
+        
+        // Add "Add Custom Hotel" option
+        const addCustomCard = createAddCustomHotelCard(city);
+        hotelGrid.appendChild(addCustomCard);
+    }
+}
+
+// Create hotel city section if it doesn't exist
+function createHotelCitySection(city) {
+    const hotelsSection = document.querySelector('.hotels-section');
+    const citySection = document.createElement('div');
+    citySection.className = 'hotel-city-section';
+    citySection.setAttribute('data-city-section', city.id);
+    
+    citySection.innerHTML = `
+        <h3>${city.name} (${city.nights})</h3>
+        <div class="hotel-grid"></div>
+    `;
+    
+    hotelsSection.appendChild(citySection);
+    return citySection;
+}
+
+// Create individual hotel card
+function createHotelCard(hotel) {
+    const card = document.createElement('div');
+    card.className = 'suggestion-card enhanced';
+    card.setAttribute('data-city', hotel.cityId);
+    card.setAttribute('data-hotel-name', hotel.name);
+    
+    card.innerHTML = `
+        ${hotel.photo ? `
+            <div class="suggestion-image">
+                <img src="${hotel.photo}" alt="${hotel.name}" onerror="this.style.display='none'">
+            </div>
+        ` : ''}
+        <div class="suggestion-content">
+            <span class="suggestion-category">BOUTIQUE HOTEL</span>
+            <h4>${hotel.name}</h4>
+            <div class="hotel-rating">${hotel.rating}</div>
+            <div class="hotel-price">${hotel.price}</div>
+            <div class="suggestion-description">${hotel.address}</div>
+            ${hotel.phone ? `<div class="suggestion-phone"><i class="fas fa-phone"></i> ${hotel.phone}</div>` : ''}
+        </div>
+        <div class="suggestion-actions">
+            ${hotel.website ? 
+                `<a href="${hotel.website}" target="_blank" class="suggestion-link">
+                    <i class="fas fa-globe"></i> Website
+                </a>` : 
+                `<a href="https://www.google.com/maps/place/?q=place_id:${hotel.place_id}" target="_blank" class="suggestion-link">
+                    <i class="fas fa-map-marker-alt"></i> View on Maps
+                </a>`
+            }
+            <button class="add-to-itinerary" data-hotel-name="${hotel.name}" data-city="${hotel.cityId}">
+                <i class="fas fa-plus"></i> Select Hotel
+            </button>
+        </div>
+    `;
+    
+    return card;
+}
+
+// Create "Browse More Hotels" card
+function createBrowseMoreCard(city) {
+    const card = document.createElement('div');
+    card.className = 'suggestion-card browse-more';
+    
+    const cityName = city.name === 'Madrid' && city.id === 'madrid-final' ? 'Madrid' : city.name;
+    const searchQuery = `hotels in ${cityName}, Spain`;
+    const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`;
+    
+    card.innerHTML = `
+        <div class="suggestion-content browse-more-content">
+            <div class="browse-more-icon">
+                <i class="fas fa-search"></i>
+            </div>
+            <h4>Browse More Hotels</h4>
+            <div class="suggestion-description">
+                Don't see what you're looking for? Search for more hotel options in ${cityName}.
+            </div>
+        </div>
+        <div class="suggestion-actions">
+            <a href="${mapsUrl}" target="_blank" class="suggestion-link">
+                <i class="fas fa-map-marker-alt"></i> View on Maps
+            </a>
+            <a href="https://www.booking.com/searchresults.html?ss=${encodeURIComponent(cityName + ', Spain')}" target="_blank" class="add-to-itinerary browse-booking">
+                <i class="fas fa-external-link-alt"></i> Browse Booking.com
+            </a>
+        </div>
+    `;
+    
+    return card;
+}
+
+// Create "Add Custom Hotel" card
+function createAddCustomHotelCard(city) {
+    const card = document.createElement('div');
+    card.className = 'suggestion-card add-custom';
+    
+    const cityName = city.name === 'Madrid' && city.id === 'madrid-final' ? 'Madrid' : city.name;
+    
+    card.innerHTML = `
+        <div class="suggestion-content add-custom-content">
+            <div class="add-custom-icon">
+                <i class="fas fa-plus-circle"></i>
+            </div>
+            <h4>Add Your Own Hotel</h4>
+            <div class="suggestion-description">
+                Found a hotel you'd like to add to your ${cityName} itinerary? Add it here.
+            </div>
+        </div>
+        <div class="suggestion-actions">
+            <button class="suggestion-link add-custom-btn" data-city-id="${city.id}" data-city-name="${cityName}">
+                <i class="fas fa-edit"></i> Add Hotel Details
+            </button>
+        </div>
+    `;
+    
+    // Add click handler for the add custom button
+    const addBtn = card.querySelector('.add-custom-btn');
+    addBtn.addEventListener('click', () => showAddCustomHotelModal(city));
+    
+    return card;
+}
+
+// Show modal to add custom hotel with Google Places Autocomplete
+function showAddCustomHotelModal(city) {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'add-custom-hotel-modal';
+    
+    const cityName = city.name === 'Madrid' && city.id === 'madrid-final' ? 'Madrid' : city.name;
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>Add Hotel - ${cityName}</h3>
+            <div class="custom-hotel-form">
+                <div class="form-group">
+                    <label for="hotel-search-input">Search for a Hotel</label>
+                    <input type="text" id="hotel-search-input" placeholder="Type hotel name in ${cityName}...">
+                    <div class="search-help">Start typing a hotel name and select from the suggestions</div>
+                </div>
+                
+                <div id="hotel-details" class="hotel-details-preview" style="display: none;">
+                    <h4>Selected Hotel:</h4>
+                    <div class="selected-hotel-info">
+                        <div class="hotel-name-display"></div>
+                        <div class="hotel-address-display"></div>
+                        <div class="hotel-rating-display"></div>
+                        <div class="hotel-phone-display"></div>
+                        <div class="hotel-website-display"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="custom-hotel-cancel">Cancel</button>
+                <button id="custom-hotel-save" disabled>Add to ${cityName} Hotels</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Initialize Google Places Autocomplete
+    initializeHotelAutocomplete(city);
+    
+    // Add event listeners
+    document.getElementById('custom-hotel-cancel').addEventListener('click', () => {
+        document.body.removeChild(modal);
     });
     
-    // If no exact match, try partial matches
-    if (results.length === 0) {
-        Object.keys(cityData).forEach(category => {
-            cityData[category].forEach(item => {
-                if (item.name.toLowerCase().includes(searchTerm) || 
-                    item.desc.toLowerCase().includes(searchTerm) ||
-                    searchTerm.split(' ').some(term => 
-                        item.name.toLowerCase().includes(term) || 
-                        item.desc.toLowerCase().includes(term)
-                    )) {
-                    results.push({...item, city: city});
-                }
-            });
-        });
-    }
+    document.getElementById('custom-hotel-save').addEventListener('click', () => {
+        saveSelectedHotel(city, modal);
+    });
     
-    // If still no results, provide general suggestions for the city
-    if (results.length === 0) {
-        const generalSuggestions = Object.values(cityData).flat().slice(0, 3);
-        results = generalSuggestions.map(item => ({...item, city: city}));
-    }
-    
-    return results.slice(0, 6); // Limit to 6 results
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
 }
+
+// Initialize Google Places Autocomplete for hotel search
+function initializeHotelAutocomplete(city) {
+    const input = document.getElementById('hotel-search-input');
+    const cityName = city.name === 'Madrid' && city.id === 'madrid-final' ? 'Madrid' : city.name;
+    
+    // Set up bias towards the city
+    const coordinates = CITY_COORDINATES[city.id === 'madrid-final' ? 'madrid' : city.id];
+    let bounds = null;
+    
+    if (coordinates) {
+        const [lat, lng] = coordinates.split(',');
+        const center = new google.maps.LatLng(parseFloat(lat), parseFloat(lng));
+        const radius = 0.1; // ~10km radius
+        bounds = new google.maps.LatLngBounds(
+            new google.maps.LatLng(center.lat() - radius, center.lng() - radius),
+            new google.maps.LatLng(center.lat() + radius, center.lng() + radius)
+        );
+    }
+    
+    const autocomplete = new google.maps.places.Autocomplete(input, {
+        types: ['lodging'],
+        bounds: bounds,
+        strictBounds: false,
+        componentRestrictions: { country: 'es' },
+        fields: ['place_id', 'name', 'formatted_address', 'rating', 'formatted_phone_number', 'website', 'photos', 'price_level']
+    });
+    
+    autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        
+        if (!place.place_id) {
+            console.log('No place selected');
+            return;
+        }
+        
+        // Check if it's in the right city
+        if (!place.formatted_address.toLowerCase().includes(cityName.toLowerCase())) {
+            alert(`Please select a hotel in ${cityName}`);
+            input.value = '';
+            return;
+        }
+        
+        displayHotelPreview(place);
+    });
+}
+
+// Display preview of selected hotel
+function displayHotelPreview(place) {
+    const detailsDiv = document.getElementById('hotel-details');
+    const saveBtn = document.getElementById('custom-hotel-save');
+    
+    // Store place data for later use
+    detailsDiv.setAttribute('data-place-id', place.place_id);
+    detailsDiv.setAttribute('data-place-data', JSON.stringify({
+        name: place.name,
+        address: place.formatted_address,
+        rating: place.rating,
+        phone: place.formatted_phone_number,
+        website: place.website,
+        photos: place.photos,
+        price_level: place.price_level
+    }));
+    
+    // Display hotel info
+    document.querySelector('.hotel-name-display').innerHTML = `<strong>${place.name}</strong>`;
+    document.querySelector('.hotel-address-display').innerHTML = `📍 ${place.formatted_address || 'Address not available'}`;
+    document.querySelector('.hotel-rating-display').innerHTML = place.rating ? `⭐ ${place.rating.toFixed(1)}` : '⭐ Rating not available';
+    document.querySelector('.hotel-phone-display').innerHTML = place.formatted_phone_number ? `📞 ${place.formatted_phone_number}` : '📞 Phone not available';
+    document.querySelector('.hotel-website-display').innerHTML = place.website ? `🌐 <a href="${place.website}" target="_blank">Website</a>` : '🌐 Website not available';
+    
+    detailsDiv.style.display = 'block';
+    saveBtn.disabled = false;
+}
+
+// Save selected hotel from Google Places
+function saveSelectedHotel(city, modal) {
+    const detailsDiv = document.getElementById('hotel-details');
+    const placeDataStr = detailsDiv.getAttribute('data-place-data');
+    
+    if (!placeDataStr) {
+        alert('Please search for and select a hotel first');
+        return;
+    }
+    
+    const placeData = JSON.parse(placeDataStr);
+    
+    // Get photo URL if available
+    let photoUrl = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=250&fit=crop'; // Default
+    if (placeData.photos && placeData.photos.length > 0) {
+        photoUrl = placeData.photos[0].getUrl({ maxWidth: 400, maxHeight: 250 });
+    }
+    
+    // Format price level
+    let priceDisplay = 'Price varies';
+    if (placeData.price_level) {
+        const euros = '€'.repeat(placeData.price_level);
+        const descriptions = ['', 'Budget', 'Moderate', 'Upscale', 'Luxury'];
+        priceDisplay = `${euros} ${descriptions[placeData.price_level] || ''}`;
+    }
+    
+    const selectedHotel = {
+        name: placeData.name,
+        address: placeData.address || 'Address not available',
+        website: placeData.website,
+        phone: placeData.phone,
+        price: priceDisplay,
+        rating: placeData.rating ? `⭐ ${placeData.rating.toFixed(1)}` : '',
+        photo: photoUrl,
+        place_id: detailsDiv.getAttribute('data-place-id'),
+        cityId: city.id
+    };
+    
+    // Add the hotel to the hotel grid
+    const citySection = findCitySectionByName(city);
+    if (citySection) {
+        const hotelGrid = citySection.querySelector('.hotel-grid');
+        const hotelCard = createHotelCard(selectedHotel);
+        
+        // Insert before the "Browse More" and "Add Custom" cards
+        const browseMoreCard = hotelGrid.querySelector('.browse-more');
+        if (browseMoreCard) {
+            hotelGrid.insertBefore(hotelCard, browseMoreCard);
+        } else {
+            hotelGrid.appendChild(hotelCard);
+        }
+    }
+    
+    // Close modal
+    document.body.removeChild(modal);
+    
+    // Show success message
+    alert(`${selectedHotel.name} has been added to your ${city.name} hotel options!`);
+}
+
+// Helper function to find city section
+function findCitySectionByName(city) {
+    const allSections = document.querySelectorAll('.hotel-city-section');
+    
+    for (const section of allSections) {
+        const h3 = section.querySelector('h3');
+        if (h3) {
+            if (city.id === 'madrid-final' && h3.textContent.includes('Final Night')) {
+                return section;
+            } else if (city.id === 'madrid' && h3.textContent.includes('Week 1 Base')) {
+                return section;
+            } else if (city.id !== 'madrid' && city.id !== 'madrid-final' && h3.textContent.includes(city.name)) {
+                return section;
+            }
+        }
+    }
+    return null;
+}
+
 
 function displaySearchResults(results) {
     const container = document.getElementById('search-results');
     
     if (results.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #666;">No results found. Try a different search term.</p>';
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <h3>No results found</h3>
+                <p>Try a different search term or check the spelling.</p>
+                <p style="font-size: 14px; margin-top: 10px;">Popular searches: restaurants, museums, bars, parks, attractions</p>
+            </div>
+        `;
         return;
     }
     
-    const html = results.map(result => `
-        <div class="suggestion-card" data-city="${result.city}">
-            <h4>${result.name}</h4>
-            <p class="suggestion-city">${result.city.charAt(0).toUpperCase() + result.city.slice(1)}</p>
-            <p>${result.desc}</p>
-            <div class="suggestion-actions">
-                ${result.link ? `<a href="${result.link}" target="_blank" class="suggestion-link">
-                    <i class="fas fa-external-link-alt"></i> More Info
-                </a>` : ''}
-                <button class="add-to-itinerary" data-activity="${result.activity}">Add to Itinerary</button>
+    const html = results.map(result => {
+        const cityName = result.city.charAt(0).toUpperCase() + result.city.slice(1);
+        const activityText = `Visit ${result.title}`;
+        
+        return `
+            <div class="suggestion-card enhanced" data-city="${result.city}">
+                ${result.image ? `
+                    <div class="suggestion-image">
+                        <img src="${result.image}" alt="${result.title}" onerror="this.style.display='none'">
+                    </div>
+                ` : ''}
+                <div class="suggestion-content">
+                    <h4>${result.title}</h4>
+                    ${result.category ? `
+                        <span class="suggestion-category">${result.category}</span>
+                    ` : ''}
+                    <p class="suggestion-city">${cityName}</p>
+                    <p class="suggestion-description">${result.description}</p>
+                    ${result.phone ? `<p class="suggestion-phone"><i class="fas fa-phone"></i> ${result.phone}</p>` : ''}
+                </div>
+                <div class="suggestion-actions">
+                    ${result.website ? 
+                        `<a href="${result.website}" target="_blank" class="suggestion-link">
+                            <i class="fas fa-globe"></i> Website
+                        </a>` : 
+                        (result.place_id ? 
+                            `<a href="https://www.google.com/maps/place/?q=place_id:${result.place_id}" target="_blank" class="suggestion-link">
+                                <i class="fas fa-map-marker-alt"></i> View on Maps
+                            </a>` : '')
+                    }
+                    <button class="add-to-itinerary" data-activity="${activityText}">
+                        <i class="fas fa-plus"></i> Add to Itinerary
+                    </button>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
     
     container.innerHTML = `<div class="suggestions-grid">${html}</div>`;
 }
-
-// Remove the old filterSuggestions function as it's no longer needed
 
 function showDaySelectorModal(activity, suggestedCity) {
     const modal = document.getElementById('day-selector-modal');
@@ -678,7 +1478,151 @@ function showDaySelectorModal(activity, suggestedCity) {
     modal.classList.add('active');
 }
 
+// Load data from Firebase
+function loadFromFirebase(callback) {
+    const tripRef = database.ref(`trips/${tripId}`);
+    
+    tripRef.once('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            console.log('Loaded data from Firebase:', data);
+            updatingFromFirebase = true;
+            itineraryData = { ...itineraryData, ...data };
+            updatingFromFirebase = false;
+        } else {
+            console.log('No existing trip data found, starting fresh');
+        }
+        
+        if (callback) callback();
+    });
+}
+
+// Setup real-time listeners for Firebase
+function setupFirebaseListeners() {
+    const tripRef = database.ref(`trips/${tripId}`);
+    
+    // Listen for changes
+    tripRef.on('value', (snapshot) => {
+        if (updatingFromFirebase) return; // Avoid loops
+        
+        const data = snapshot.val();
+        if (data && data.lastUpdated && data.lastUpdated !== itineraryData.lastUpdated) {
+            console.log('Received update from Firebase');
+            updatingFromFirebase = true;
+            
+            // Update local data
+            itineraryData = { ...itineraryData, ...data };
+            
+            // Refresh UI
+            refreshUIFromData();
+            
+            updatingFromFirebase = false;
+        }
+    });
+}
+
+// Refresh UI from data
+function refreshUIFromData() {
+    // Restore hotel selections
+    restoreHotelSelections();
+    
+    // Restore trip dates
+    updateTripDatesDisplay();
+    
+    // Restore todo items
+    initializeTodoItems();
+    updateTodoProgress();
+    
+    // Restore activities
+    initializeActivities();
+    
+    // Show success notification
+    showSyncNotification('Trip updated from another device');
+}
+
+// Show sync notification
+function showSyncNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'sync-notification';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => document.body.removeChild(notification), 300);
+    }, 3000);
+}
+
+// Show share modal
+function showShareModal() {
+    const shareUrl = window.location.href;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'share-modal';
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h3>Share This Trip</h3>
+            <p>Share this link with your travel companions to collaborate in real-time:</p>
+            <div class="share-link-container">
+                <input type="text" id="share-link" value="${shareUrl}" readonly>
+                <button id="copy-link-btn">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+            <div class="share-instructions">
+                <p><strong>How it works:</strong></p>
+                <ul>
+                    <li>Anyone with this link can view and edit the trip</li>
+                    <li>Changes sync automatically across all devices</li>
+                    <li>Bookmark this page to return to your trip</li>
+                </ul>
+            </div>
+            <div class="modal-buttons">
+                <button id="share-close">Close</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Copy button
+    document.getElementById('copy-link-btn').addEventListener('click', () => {
+        const input = document.getElementById('share-link');
+        input.select();
+        document.execCommand('copy');
+        
+        const btn = document.getElementById('copy-link-btn');
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        btn.style.backgroundColor = '#27ae60';
+        
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+            btn.style.backgroundColor = '';
+        }, 2000);
+    });
+    
+    // Close button
+    document.getElementById('share-close').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+    
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
+}
+
 function saveData() {
+    if (updatingFromFirebase) return; // Don't save while updating from Firebase
+    
     // Collect all current data
     const days = document.querySelectorAll('.day');
     
@@ -698,15 +1642,6 @@ function saveData() {
         itineraryData.activities[dayNum] = activities;
     });
     
-    // Save notes
-    itineraryData.notes = {};
-    days.forEach(day => {
-        const dayNum = day.getAttribute('data-day');
-        const notes = day.querySelector('.day-notes').value;
-        if (notes) {
-            itineraryData.notes[dayNum] = notes;
-        }
-    });
     
     // Save collapsed states
     itineraryData.collapsedDays = [];
@@ -716,15 +1651,35 @@ function saveData() {
         }
     });
     
-    // Save to localStorage
-    localStorage.setItem('spainItinerary', JSON.stringify(itineraryData));
+    // Add timestamp
+    itineraryData.lastUpdated = Date.now();
+    
+    // Save to Firebase
+    const tripRef = database.ref(`trips/${tripId}`);
+    tripRef.set(itineraryData)
+        .then(() => {
+            console.log('Saved to Firebase successfully');
+        })
+        .catch((error) => {
+            console.error('Error saving to Firebase:', error);
+            // Fallback to localStorage
+            localStorage.setItem('spainItinerary', JSON.stringify(itineraryData));
+        });
 }
 
 function loadSavedData() {
     const saved = localStorage.getItem('spainItinerary');
     if (!saved) return;
     
-    itineraryData = JSON.parse(saved);
+    const savedData = JSON.parse(saved);
+    
+    // Only override HTML content if we have actual saved activities
+    // Otherwise preserve the detailed HTML content
+    if (!savedData.activities || Object.keys(savedData.activities).length === 0) {
+        return;
+    }
+    
+    itineraryData = savedData;
     
     // Restore activities
     if (itineraryData.activities) {
@@ -751,15 +1706,6 @@ function loadSavedData() {
         });
     }
     
-    // Restore notes
-    if (itineraryData.notes) {
-        Object.keys(itineraryData.notes).forEach(dayNum => {
-            const day = document.querySelector(`[data-day="${dayNum}"]`);
-            if (day) {
-                day.querySelector('.day-notes').value = itineraryData.notes[dayNum];
-            }
-        });
-    }
     
     // Restore day titles
     if (itineraryData.dayTitles) {
@@ -1425,14 +2371,13 @@ function setupCityDragAndDrop() {
 }
 
 function regenerateItinerary() {
-    if (!confirm('This will regenerate the entire itinerary based on your city selections. Current activities and notes will be preserved where possible. Continue?')) {
+    if (!confirm('This will regenerate the entire itinerary based on your city selections. Current activities will be preserved where possible. Continue?')) {
         return;
     }
     
-    // Store current activities and notes for preservation
+    // Store current activities for preservation
     const preservedData = {
         activities: { ...itineraryData.activities },
-        notes: { ...itineraryData.notes },
         dayTitles: { ...itineraryData.dayTitles }
     };
     
@@ -1537,10 +2482,6 @@ function createTravelDay(dayNum, fromCity, toCity) {
                 </li>
             </ul>
             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-            <div class="notes-section">
-                <label>Personal Notes:</label>
-                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-            </div>
         </div>
     `;
     
@@ -1573,10 +2514,6 @@ function createArrivalDay(dayNum, city) {
                 </li>
             </ul>
             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-            <div class="notes-section">
-                <label>Personal Notes:</label>
-                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-            </div>
         </div>
     `;
     
@@ -1601,10 +2538,6 @@ function createStayDay(dayNum, city, cityKey) {
             <ul class="activity-list">
             </ul>
             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-            <div class="notes-section">
-                <label>Personal Notes:</label>
-                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-            </div>
         </div>
     `;
     
@@ -1633,10 +2566,6 @@ function createDepartureDay(dayNum) {
                 </li>
             </ul>
             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-            <div class="notes-section">
-                <label>Personal Notes:</label>
-                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-            </div>
         </div>
     `;
     
@@ -1675,12 +2604,6 @@ function setupDayEventListeners() {
         });
     });
     
-    const noteTextareas = document.querySelectorAll('.day-notes');
-    noteTextareas.forEach(textarea => {
-        textarea.addEventListener('input', function() {
-            saveData();
-        });
-    });
     
     // Re-setup drag and drop
     setupDragAndDrop();

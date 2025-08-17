@@ -6,6 +6,11 @@
     <title>Spain Trip Planner - November</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCp9Q1buixo8BTH7d_nHdpc4-KYSoIz8Wc&libraries=places&callback=initMap"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -173,10 +178,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -204,10 +205,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -235,10 +232,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -265,10 +258,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -296,10 +285,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -326,10 +311,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -353,10 +334,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -390,10 +367,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -421,10 +394,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -452,10 +421,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -485,10 +450,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -518,10 +479,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -549,10 +506,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -578,10 +531,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
 
@@ -601,10 +550,6 @@
                                 </li>
                             </ul>
                             <button class="add-activity-btn"><i class="fas fa-plus"></i> Add Activity</button>
-                            <div class="notes-section">
-                                <label>Personal Notes:</label>
-                                <textarea class="day-notes" placeholder="Add your notes here..."></textarea>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -777,44 +722,11 @@
                 </div>
 
                 <div class="search-results" id="search-results">
-                    <!-- Default suggestions -->
-                    <div class="suggestions-grid">
-                        <div class="suggestion-card" data-city="madrid">
-                            <h4>Reina Sofía Museum</h4>
-                            <p class="suggestion-city">Madrid</p>
-                            <p>Home to Picasso's Guernica and modern Spanish art</p>
-                            <button class="add-to-itinerary" data-activity="Visit Reina Sofía Museum">Add to Itinerary</button>
-                        </div>
-                        <div class="suggestion-card" data-city="madrid">
-                            <h4>El Rastro Flea Market</h4>
-                            <p class="suggestion-city">Madrid</p>
-                            <p>Sunday morning flea market in La Latina</p>
-                            <button class="add-to-itinerary" data-activity="Browse El Rastro Flea Market (Sundays)">Add to Itinerary</button>
-                        </div>
-                        <div class="suggestion-card" data-city="seville">
-                            <h4>Plaza de España</h4>
-                            <p class="suggestion-city">Seville</p>
-                            <p>Stunning semicircular plaza with tile work</p>
-                            <button class="add-to-itinerary" data-activity="Visit Plaza de España">Add to Itinerary</button>
-                        </div>
-                        <div class="suggestion-card" data-city="granada">
-                            <h4>Sacromonte Caves</h4>
-                            <p class="suggestion-city">Granada</p>
-                            <p>Traditional cave dwellings with flamenco shows</p>
-                            <button class="add-to-itinerary" data-activity="Explore Sacromonte cave quarter">Add to Itinerary</button>
-                        </div>
-                        <div class="suggestion-card" data-city="cordoba">
-                            <h4>Palacio de Viana</h4>
-                            <p class="suggestion-city">Córdoba</p>
-                            <p>Palace with 12 beautiful courtyards</p>
-                            <button class="add-to-itinerary" data-activity="Tour Palacio de Viana and its courtyards">Add to Itinerary</button>
-                        </div>
-                        <div class="suggestion-card" data-city="madrid">
-                            <h4>Chocolatería San Ginés</h4>
-                            <p class="suggestion-city">Madrid</p>
-                            <p>Famous churros con chocolate since 1894</p>
-                            <button class="add-to-itinerary" data-activity="Churros at Chocolatería San Ginés">Add to Itinerary</button>
-                        </div>
+                    <!-- API Setup Instructions -->
+                    <div style="text-align: center; padding: 40px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 10px; margin: 20px 0;">
+                        <h3 style="color: #667eea; margin-bottom: 20px;">🔍 Live Recommendations Ready!</h3>
+                        <p style="color: #666; margin-bottom: 15px;">Enter a search term above to discover amazing places with photos, ratings, and reviews powered by Google.</p>
+                        <p style="color: #888; font-size: 14px;">Try searching for: restaurants, museums, bars, cafes, attractions, or specific cuisine types</p>
                     </div>
                 </div>
 

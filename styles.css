@@ -25,8 +25,84 @@ header {
     text-align: center;
 }
 
-.trip-dates-section {
+.share-section {
     margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.share-btn {
+    background-color: #9b59b6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.share-btn:hover {
+    background-color: #8e44ad;
+}
+
+.trip-dates-section {
+    margin-top: 10px;
+}
+
+/* Share modal */
+.share-link-container {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+#share-link {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 14px;
+    background-color: #f8f9fa;
+}
+
+#copy-link-btn {
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#copy-link-btn:hover {
+    background-color: #2980b9;
+}
+
+.share-instructions {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.share-instructions ul {
+    margin: 10px 0 0 20px;
+    line-height: 1.6;
+}
+
+#share-close {
+    background-color: #95a5a6;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#share-close:hover {
+    background-color: #7f8c8d;
 }
 
 .set-dates-btn {
@@ -663,6 +739,294 @@ a:hover {
     background-color: #95a5a6;
 }
 
+/* Enhanced hotel cards with photos from Google Places */
+.hotel-card.enhanced {
+    padding: 0;
+    overflow: hidden;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.hotel-card.enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.hotel-image {
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.hotel-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.hotel-card.enhanced:hover .hotel-image img {
+    transform: scale(1.05);
+}
+
+.hotel-content {
+    padding: 15px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.hotel-rating {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #f39c12;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.hotel-rating::before {
+    content: '★';
+    color: #f39c12;
+}
+
+.hotel-address {
+    color: #7f8c8d;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.hotel-phone {
+    color: #888;
+    font-size: 13px;
+    margin: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.hotel-phone i {
+    color: #3498db;
+}
+
+/* Browse More Hotels card */
+.suggestion-card.browse-more {
+    border: 2px dashed #ddd;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    transition: all 0.3s ease;
+}
+
+.suggestion-card.browse-more:hover {
+    border-color: #3498db;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f8f9fa 100%);
+    transform: translateY(-2px);
+}
+
+.browse-more-content {
+    text-align: center;
+    padding: 30px 15px 15px 15px;
+}
+
+.browse-more-icon {
+    font-size: 2.5em;
+    color: #7f8c8d;
+    margin-bottom: 15px;
+}
+
+.suggestion-card.browse-more:hover .browse-more-icon {
+    color: #3498db;
+}
+
+.browse-booking {
+    background-color: #f39c12 !important;
+}
+
+.browse-booking:hover {
+    background-color: #e67e22 !important;
+}
+
+/* Add Custom Hotel card */
+.suggestion-card.add-custom {
+    border: 2px dashed #27ae60;
+    background: linear-gradient(135deg, #e8f8f5 0%, #f8f9fa 100%);
+    transition: all 0.3s ease;
+}
+
+.suggestion-card.add-custom:hover {
+    border-color: #27ae60;
+    background: linear-gradient(135deg, #d5edd8 0%, #e8f8f5 100%);
+    transform: translateY(-2px);
+}
+
+.add-custom-content {
+    text-align: center;
+    padding: 30px 15px 15px 15px;
+}
+
+.add-custom-icon {
+    font-size: 2.5em;
+    color: #27ae60;
+    margin-bottom: 15px;
+}
+
+.add-custom-btn {
+    background-color: #27ae60 !important;
+    color: white !important;
+    border: none !important;
+}
+
+.add-custom-btn:hover {
+    background-color: #229954 !important;
+}
+
+/* Custom Hotel Form */
+.custom-hotel-form {
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+#custom-hotel-save {
+    background-color: #27ae60;
+    color: white;
+}
+
+#custom-hotel-save:hover {
+    background-color: #229954;
+}
+
+/* Google Places Hotel Search */
+#hotel-search-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+#hotel-search-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.3);
+}
+
+.search-help {
+    font-size: 13px;
+    color: #7f8c8d;
+    margin-top: 5px;
+    font-style: italic;
+}
+
+.hotel-details-preview {
+    margin-top: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.hotel-details-preview h4 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.selected-hotel-info > div {
+    margin-bottom: 8px;
+    padding: 5px 0;
+}
+
+.hotel-name-display {
+    font-size: 18px;
+    color: #2c3e50;
+}
+
+.hotel-address-display,
+.hotel-rating-display,
+.hotel-phone-display,
+.hotel-website-display {
+    font-size: 14px;
+    color: #555;
+}
+
+.hotel-website-display a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+.hotel-website-display a:hover {
+    text-decoration: underline;
+}
+
+#custom-hotel-save:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+#custom-hotel-save:disabled:hover {
+    background-color: #bdc3c7;
+}
+
+/* Sync notification */
+.sync-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #27ae60;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.sync-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.sync-notification::before {
+    content: '✓ ';
+    font-weight: bold;
+    margin-right: 5px;
+}
+
 /* Search Section */
 .ai-search-controls {
     margin-bottom: 30px;
@@ -769,6 +1133,80 @@ a:hover {
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
+/* Enhanced suggestion cards with images from Google Places API */
+.suggestion-card.enhanced {
+    padding: 0;
+    overflow: hidden;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.suggestion-card.enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.suggestion-image {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.suggestion-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.suggestion-card.enhanced:hover .suggestion-image img {
+    transform: scale(1.05);
+}
+
+.suggestion-content {
+    padding: 15px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.suggestion-category {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.suggestion-description {
+    color: #666;
+    font-size: 14px;
+    line-height: 1.4;
+    margin: 8px 0;
+}
+
+.suggestion-phone {
+    color: #888;
+    font-size: 13px;
+    margin: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.suggestion-phone i {
+    color: #667eea;
+}
+
 .suggestion-card h4 {
     margin-bottom: 5px;
 }
@@ -790,6 +1228,9 @@ a:hover {
     display: flex;
     gap: 10px;
     align-items: center;
+    margin-top: auto;
+    padding: 15px;
+    padding-top: 0;
 }
 
 .suggestion-link {
@@ -823,6 +1264,22 @@ a:hover {
 
 .add-to-itinerary:hover {
     background-color: #c0392b;
+}
+
+/* Selected hotel button state */
+.add-to-itinerary.selected {
+    background-color: #27ae60 !important;
+    color: white !important;
+}
+
+.add-to-itinerary.selected:hover {
+    background-color: #27ae60 !important;
+    cursor: default;
+}
+
+.add-to-itinerary:disabled {
+    opacity: 0.8;
+    cursor: default;
 }
 
 /* Action Buttons */

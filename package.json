@@ -1,0 +1,13 @@
+{
+  "name": "spain-trip-planner",
+  "version": "1.0.0",
+  "description": "Interactive Spain trip planner for Silvia & Irene",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python3 -m http.server 3000",
+    "start": "python3 -m http.server 3000"
+  },
+  "keywords": ["travel", "spain", "itinerary"],
+  "author": "Travel Planner",
+  "license": "MIT"
+}
