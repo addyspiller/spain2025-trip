@@ -3,24 +3,53 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables from .env file
+// Load environment variables from .env file or process.env (for Netlify)
 function loadEnv() {
     const envPath = path.join(__dirname, '.env');
-    if (!fs.existsSync(envPath)) {
-        console.error('❌ .env file not found. Copy .env.example to .env and fill in your API keys.');
+    let env = {};
+    
+    // Try to load from .env file first (for local development)
+    if (fs.existsSync(envPath)) {
+        console.log('📁 Loading environment variables from .env file');
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        
+        envContent.split('\n').forEach(line => {
+            const [key, ...value] = line.split('=');
+            if (key && value.length) {
+                env[key.trim()] = value.join('=').trim();
+            }
+        });
+    } else {
+        console.log('🌐 Loading environment variables from process.env (production)');
+        // Load from process.env (Netlify, etc.)
+        env = {
+            FIREBASE_API_KEY: process.env.FIREBASE_API_KEY,
+            FIREBASE_AUTH_DOMAIN: process.env.FIREBASE_AUTH_DOMAIN,
+            FIREBASE_DATABASE_URL: process.env.FIREBASE_DATABASE_URL,
+            FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+            FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
+            FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID,
+            FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
+            FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID,
+            GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY
+        };
+    }
+    
+    // Validate required environment variables
+    const required = [
+        'FIREBASE_API_KEY', 'FIREBASE_AUTH_DOMAIN', 'FIREBASE_DATABASE_URL',
+        'FIREBASE_PROJECT_ID', 'FIREBASE_STORAGE_BUCKET', 'FIREBASE_MESSAGING_SENDER_ID',
+        'FIREBASE_APP_ID', 'FIREBASE_MEASUREMENT_ID', 'GOOGLE_MAPS_API_KEY'
+    ];
+    
+    const missing = required.filter(key => !env[key]);
+    if (missing.length > 0) {
+        console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
+        console.error('💡 Set these in Netlify Site Settings → Environment Variables');
         process.exit(1);
     }
     
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const env = {};
-    
-    envContent.split('\n').forEach(line => {
-        const [key, ...value] = line.split('=');
-        if (key && value.length) {
-            env[key.trim()] = value.join('=').trim();
-        }
-    });
-    
+    console.log('✅ All required environment variables loaded');
     return env;
 }
 
